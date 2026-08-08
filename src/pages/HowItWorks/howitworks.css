@@ -1,0 +1,396 @@
+/* ════════════════════════════════════════════════════════════════════
+   HOW IT WORKS – FLOWCHART  (Light-first, dark-mode overrides below)
+   ════════════════════════════════════════════════════════════════════ */
+
+/* ── Page Wrapper ──────────────────────────────────────────────────── */
+.hiw-page-wrapper {
+  overflow-x: hidden;
+}
+
+/* ── Hero ──────────────────────────────────────────────────────────── */
+.hiw-hero {
+  padding-top: 8rem;
+  padding-bottom: 2rem;
+  position: relative;
+}
+
+.hiw-hero::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse 80% 40% at 50% 0%, rgba(99, 102, 241, 0.08) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+/* ── Role Tabs ─────────────────────────────────────────────────────── */
+.hiw-role-tabs-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  background: var(--glass-bg-subtle);
+  border: 1px solid var(--glass-border);
+  padding: 0.4rem;
+  border-radius: var(--radius-full);
+  max-width: 640px;
+  margin: 2.5rem auto 0;
+  backdrop-filter: var(--glass-blur);
+  flex-wrap: wrap;
+}
+
+.hiw-role-tab {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.65rem 1.5rem;
+  border-radius: var(--radius-full);
+  border: none;
+  background: transparent;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-muted);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  font-family: var(--font-sans);
+  white-space: nowrap;
+  letter-spacing: 0.01em;
+}
+
+.hiw-role-tab:hover {
+  color: var(--color-primary);
+  background: var(--color-primary-light);
+}
+
+.hiw-role-tab.active {
+  background: var(--gradient-primary);
+  color: #ffffff;
+  box-shadow: var(--shadow-md), var(--shadow-glow-primary);
+}
+
+/* ── Flowchart Section ──────────────────────────────────────────────── */
+.hiw-flow-section {
+  padding: 2rem 0;
+}
+
+.hiw-flowchart-wrapper {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+  padding: 2rem 1rem;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+/* Central spine */
+.hiw-flowchart-wrapper::before {
+  content: '';
+  position: absolute;
+  top: 60px;
+  bottom: 60px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 2px;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    var(--color-primary-ring) 15%,
+    var(--color-secondary) 50%,
+    var(--color-primary-ring) 85%,
+    transparent 100%
+  );
+  z-index: 0;
+}
+
+/* ── Each Step Row ──────────────────────────────────────────────────── */
+.hiw-flow-row {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  position: relative;
+  z-index: 1;
+}
+
+.hiw-flow-row.left-side {
+  flex-direction: row;
+  justify-content: flex-start;
+}
+
+.hiw-flow-row.right-side {
+  flex-direction: row-reverse;
+  justify-content: flex-start;
+}
+
+/* ── The Card ─────────────────────────────────────────── */
+.hiw-flow-card-new {
+  width: calc(50% - 60px);
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-xl);
+  padding: 1.6rem 1.75rem;
+  position: relative;
+  transition: all var(--transition-normal);
+  overflow: hidden;
+  box-shadow: var(--shadow-md);
+  backdrop-filter: var(--glass-blur);
+}
+
+.hiw-flow-card-new:hover {
+  border-color: var(--color-primary);
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-xl), var(--shadow-glow-primary);
+}
+
+/* Tail connector from card to spine — left */
+.hiw-flow-row.left-side .hiw-flow-card-new::after {
+  content: '';
+  position: absolute;
+  right: -28px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 28px;
+  height: 2px;
+  background: linear-gradient(90deg, var(--color-primary), transparent);
+}
+
+/* Tail connector from card to spine — right */
+.hiw-flow-row.right-side .hiw-flow-card-new::after {
+  content: '';
+  position: absolute;
+  left: -28px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 28px;
+  height: 2px;
+  background: linear-gradient(270deg, var(--color-primary), transparent);
+}
+
+/* ── Step Node (circle on spine) ─────────────────────── */
+.hiw-flow-node {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: var(--gradient-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  color: #fff;
+  z-index: 2;
+  box-shadow: var(--shadow-glow-primary);
+  transition: all var(--transition-normal);
+  flex-shrink: 0;
+}
+
+.hiw-flow-node:hover {
+  transform: translateX(-50%) scale(1.1);
+  box-shadow: var(--shadow-lg), var(--shadow-glow-primary);
+}
+
+.hiw-flow-node-step {
+  font-size: 0.58rem;
+  font-weight: 700;
+  opacity: 0.85;
+  line-height: 1;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.hiw-flow-node-num {
+  font-size: 1.1rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+/* ── Card Inner ──────────────────────────────────────────────────── */
+.hiw-card-inner {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.hiw-card-icon-wrap-new {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-md);
+  background: var(--color-primary-light);
+  border: 1px solid var(--color-primary-ring);
+  color: var(--color-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  flex-shrink: 0;
+  transition: all var(--transition-fast);
+}
+
+.hiw-flow-card-new:hover .hiw-card-icon-wrap-new {
+  background: var(--color-primary);
+  color: #ffffff;
+  box-shadow: var(--shadow-glow-primary);
+}
+
+.hiw-card-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.hiw-card-title-new {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--color-text);
+  margin: 0 0 0.375rem;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+}
+
+.hiw-card-desc-new {
+  font-size: 0.84rem;
+  color: var(--color-muted);
+  line-height: 1.6;
+  margin: 0;
+}
+
+/* ── Connector dot between rows ───────────────────────────────────── */
+.hiw-flow-connector {
+  height: 70px;
+  width: 100%;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1;
+}
+
+.hiw-flow-connector-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  box-shadow: var(--shadow-glow-primary);
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 0.45; transform: translateX(-50%) scale(1); }
+  50% { opacity: 1; transform: translateX(-50%) scale(1.5); }
+}
+
+/* ── Benefits Grid ───────────────────────────────────── */
+.hiw-benefits-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.5rem;
+}
+
+.hiw-benefit-card {
+  padding: 2rem;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-md);
+  transition: all var(--transition-normal);
+}
+
+.hiw-benefit-card:hover {
+  border-color: var(--color-primary);
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-xl), var(--shadow-glow-primary);
+}
+
+.hiw-benefit-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.hiw-benefit-icon {
+  width: 46px;
+  height: 46px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+  flex-shrink: 0;
+}
+
+.hiw-benefit-target {
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin: 0;
+  color: var(--color-text);
+}
+
+.hiw-benefit-items {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.hiw-benefit-items li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.625rem;
+  font-size: 0.875rem;
+  color: var(--color-muted);
+  line-height: 1.5;
+}
+
+/* ── Responsive ──────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .hiw-role-tabs-container {
+    flex-direction: column;
+    border-radius: var(--radius-xl);
+  }
+  .hiw-role-tab {
+    width: 100%;
+    border-radius: var(--radius-md);
+  }
+
+  .hiw-flowchart-wrapper::before {
+    left: 28px;
+    transform: none;
+  }
+
+  .hiw-flow-row.left-side,
+  .hiw-flow-row.right-side {
+    flex-direction: row;
+    justify-content: flex-start;
+    padding-left: 60px;
+  }
+
+  .hiw-flow-card-new {
+    width: 100%;
+  }
+
+  .hiw-flow-card-new::after {
+    display: none;
+  }
+
+  .hiw-flow-node {
+    left: 28px;
+    transform: translateX(-50%);
+  }
+}
+
+@media (max-width: 480px) {
+  .hiw-card-inner {
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+}
+

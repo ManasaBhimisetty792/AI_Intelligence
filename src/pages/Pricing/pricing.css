@@ -1,0 +1,610 @@
+/* ========================================================================================
+   SKILLTRACK AI — Student Pricing Page — Complete CSS (Dark Mode Aware)
+   Uses CSS variables from theme.css so dark/light mode switches automatically.
+   ======================================================================================== */
+
+/* ── Page Wrapper ──────────────────────────────────────────────────── */
+.pricing-page-wrapper {
+  min-height: 100vh;
+  background: var(--color-bg);
+  color: var(--color-text);
+  overflow-x: hidden;
+  transition: background 0.3s ease, color 0.3s ease;
+}
+
+/* ── Hero ─────────────────────────────────────────────────────────── */
+.pricing-hero-section {
+  padding: 7rem 1.5rem 3rem;
+  text-align: center;
+}
+
+.pricing-hero__badge-container {
+  margin-bottom: 1.25rem;
+}
+
+.pricing-hero__title {
+  font-size: clamp(2rem, 5vw, 3rem);
+  font-weight: 900;
+  color: var(--color-text);
+  line-height: 1.2;
+  margin: 0 0 1.25rem;
+  letter-spacing: -0.02em;
+  transition: color 0.3s ease;
+}
+
+.pricing-gradient-text {
+  background: var(--gradient-primary);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.pricing-hero__subtitle {
+  font-size: 1.1rem;
+  color: var(--color-muted);
+  max-width: 640px;
+  margin: 0 auto;
+  line-height: 1.7;
+  transition: color 0.3s ease;
+}
+
+/* ── Pricing Grid ─────────────────────────────────────────────────── */
+.pricing-cards-container {
+  padding: 2rem 1.5rem 4rem;
+}
+
+.pricing-grid-layout {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 2rem;
+  max-width: 960px;
+  margin: 0 auto;
+  align-items: start;
+}
+
+/* ── FREE CARD ───────────────────────────────────────────────────── */
+.pricing-card--free {
+  background: var(--color-surface-solid);
+  border: 1.5px solid var(--color-border-dark);
+  border-radius: 1.5rem;
+  padding: 2.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  box-shadow: var(--shadow-md);
+  transition: transform 0.25s ease, box-shadow 0.25s ease, background 0.3s ease, border-color 0.3s ease;
+}
+
+.pricing-card--free:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-xl);
+}
+
+.pricing-card__title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.6rem;
+}
+
+.pricing-card__plan-title--free {
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: var(--color-text);
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  transition: color 0.3s ease;
+}
+
+.pricing-icon--free {
+  color: var(--color-warning);
+  font-size: 1.2rem;
+}
+
+.pricing-badge--free {
+  background: var(--color-primary-light);
+  color: var(--color-muted);
+  padding: 0.25rem 0.7rem;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  transition: background 0.3s ease, color 0.3s ease;
+}
+
+.pricing-card__desc {
+  font-size: 0.875rem;
+  color: var(--color-muted);
+  margin: 0 0 1.5rem;
+  line-height: 1.5;
+  transition: color 0.3s ease;
+}
+
+.pricing-card__price-row {
+  margin-bottom: 1.75rem;
+  display: flex;
+  align-items: baseline;
+  gap: 0.25rem;
+}
+
+.price-amount--free {
+  font-size: 3rem;
+  font-weight: 900;
+  color: var(--color-text);
+  line-height: 1;
+  transition: color 0.3s ease;
+}
+
+.price-period--free {
+  font-size: 0.9rem;
+  color: var(--color-muted);
+  font-weight: 500;
+  transition: color 0.3s ease;
+}
+
+/* ── PREMIUM CARD ────────────────────────────────────────────────── */
+.pricing-card--premium {
+  background: var(--gradient-surface);
+  border: 2px solid var(--color-primary);
+  border-radius: var(--radius-2xl);
+  padding: 2.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  box-shadow: var(--shadow-xl), var(--shadow-glow-primary);
+  position: relative;
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+  color: var(--color-text);
+}
+
+.pricing-card--premium:hover {
+  transform: translateY(-6px);
+  box-shadow: var(--shadow-xl), var(--shadow-glow-primary);
+}
+
+.recommended-pill-wrapper {
+  position: absolute;
+  top: -16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+}
+
+.recommended-pill {
+  background: var(--gradient-primary);
+  color: #ffffff;
+  padding: 0.35rem 1rem;
+  border-radius: var(--radius-full);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+  box-shadow: var(--shadow-glow-primary);
+  display: inline-block;
+}
+
+.pricing-card__plan-title--premium {
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: var(--color-text);
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.pricing-icon--premium {
+  color: var(--color-primary);
+  font-size: 1.25rem;
+}
+
+.pricing-badge--premium {
+  background: var(--color-primary-light);
+  border: 1px solid var(--color-primary);
+  color: var(--color-primary);
+  padding: 0.25rem 0.7rem;
+  border-radius: var(--radius-full);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+}
+
+.pricing-card__desc--premium {
+  color: var(--color-muted);
+}
+
+.price-amount--premium {
+  font-size: 3rem;
+  font-weight: 900;
+  color: var(--color-text);
+  line-height: 1;
+}
+
+.price-period--premium {
+  font-size: 0.9rem;
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+/* ── Feature Lists ────────────────────────────────────────────────── */
+.pricing-feature-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+  flex: 1;
+}
+
+.feature-item--included {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  font-size: 0.9rem;
+  color: var(--color-text);
+  font-weight: 500;
+  transition: color 0.3s ease;
+}
+
+.feature-item--disabled {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  font-size: 0.9rem;
+  color: var(--color-subtle);
+  text-decoration: line-through;
+  transition: color 0.3s ease;
+}
+
+.feature-item--premium {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  font-size: 0.9rem;
+  color: var(--color-text);
+  font-weight: 500;
+}
+
+.check-icon {
+  color: var(--color-success);
+  font-size: 1.05rem;
+  flex-shrink: 0;
+  transition: color var(--transition-fast);
+}
+
+.cross-icon {
+  color: var(--color-subtle);
+  font-size: 1.05rem;
+  flex-shrink: 0;
+  transition: color var(--transition-fast);
+}
+
+.check-icon--premium {
+  color: var(--color-primary);
+  font-size: 1.05rem;
+  flex-shrink: 0;
+}
+
+/* ── Buttons ──────────────────────────────────────────────────────── */
+.pricing-card__footer {
+  margin-top: auto;
+}
+
+.btn-plan-free {
+  display: block;
+  width: 100%;
+  padding: 0.875rem;
+  text-align: center;
+  border-radius: 0.85rem;
+  background: var(--color-primary-light);
+  color: var(--color-text);
+  font-weight: 700;
+  font-size: 0.95rem;
+  text-decoration: none;
+  border: 1.5px solid var(--color-border-dark);
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.btn-plan-free:hover {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: #ffffff;
+}
+
+.btn-plan-current {
+  width: 100%;
+  padding: 0.875rem;
+  border-radius: 0.85rem;
+  background: var(--color-primary-light);
+  color: var(--color-subtle);
+  border: 1.5px solid var(--color-border-dark);
+  font-weight: 700;
+  font-size: 0.95rem;
+  cursor: default;
+  font-family: inherit;
+  transition: background 0.3s ease, border-color 0.3s ease;
+}
+
+.btn-plan-upgrade-premium {
+  width: 100%;
+  padding: 0.95rem;
+  border-radius: var(--radius-lg);
+  border: none;
+  background: var(--gradient-primary);
+  color: #ffffff;
+  font-weight: 800;
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  box-shadow: var(--shadow-md), var(--shadow-glow-primary);
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+  font-family: inherit;
+}
+
+.btn-plan-upgrade-premium:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg), var(--shadow-glow-primary);
+}
+
+.btn-plan-active-premium {
+  width: 100%;
+  padding: 0.875rem;
+  border-radius: var(--radius-lg);
+  background: var(--color-primary-light);
+  border: 1.5px solid var(--color-primary);
+  color: var(--color-primary);
+  font-weight: 700;
+  font-size: 0.92rem;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+/* ── Recruiter Banner ─────────────────────────────────────────────── */
+.recruiter-banner-section {
+  padding: 0 1.5rem 3rem;
+}
+
+.recruiter-banner-card {
+  max-width: 960px;
+  margin: 0 auto;
+  background: var(--color-success-light);
+  border: 1.5px solid var(--color-success);
+  border-radius: var(--radius-xl);
+  padding: 1.75rem 2rem;
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  box-shadow: var(--shadow-sm);
+  transition: background var(--transition-normal), border-color var(--transition-normal);
+}
+
+.recruiter-banner__icon {
+  font-size: 2.5rem;
+  color: var(--color-success);
+  flex-shrink: 0;
+  transition: color var(--transition-normal);
+}
+
+.recruiter-banner__title {
+  margin: 0 0 0.4rem;
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: var(--color-text);
+  transition: color var(--transition-normal);
+}
+
+.recruiter-banner__subtitle {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--color-muted);
+  line-height: 1.6;
+  transition: color var(--transition-normal);
+}
+
+/* ── FAQ Section ──────────────────────────────────────────────────── */
+.pricing-faq-section {
+  padding: 3rem 1.5rem 4rem;
+  background: var(--color-bg);
+  transition: background 0.3s ease;
+}
+
+.pricing-faq__header {
+  max-width: 700px;
+  margin: 0 auto 2.5rem;
+  text-align: center;
+}
+
+.faq-title {
+  font-size: 2.25rem;
+  font-weight: 800;
+  color: var(--color-text);
+  margin: 0 0 0.5rem;
+  letter-spacing: -0.015em;
+  transition: color 0.3s ease;
+}
+
+.faq-subtitle {
+  color: var(--color-muted);
+  font-size: 1rem;
+  margin: 0;
+  transition: color 0.3s ease;
+}
+
+.faq-accordion-list {
+  max-width: 800px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.faq-card-item {
+  background: var(--color-surface-solid);
+  border: 1.5px solid var(--color-border-dark);
+  border-radius: 1rem;
+  padding: 1.25rem 1.5rem;
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.3s ease;
+}
+
+.faq-card-item:hover {
+  border-color: #c4b5fd;
+  box-shadow: 0 4px 16px rgba(168, 85, 247, 0.15);
+}
+
+.faq-card-item--open {
+  border-color: #a855f7;
+  box-shadow: 0 4px 20px rgba(168, 85, 247, 0.2);
+}
+
+.faq-question-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  user-select: none;
+}
+
+.faq-question-text {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--color-text);
+  flex: 1;
+  line-height: 1.4;
+  transition: color 0.3s ease;
+}
+
+.faq-chevron-icon {
+  font-size: 1.2rem;
+  color: #6366f1;
+  flex-shrink: 0;
+  transition: transform 0.3s ease, color 0.3s ease;
+}
+
+.faq-chevron-icon--open {
+  transform: rotate(180deg);
+  color: #a855f7;
+}
+
+.faq-answer-body {
+  margin: 0.9rem 0 0;
+  color: var(--color-muted);
+  font-size: 0.92rem;
+  line-height: 1.7;
+  transition: color 0.3s ease;
+}
+
+/* ── Responsive ────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .pricing-grid-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .pricing-hero__title {
+    font-size: 2rem;
+  }
+
+  .recruiter-banner-card {
+    flex-direction: column;
+    text-align: center;
+    padding: 1.5rem;
+  }
+}
+
+/* ── Dark Mode — Extra Overrides ────────────────────────────────────── */
+/* These supplement variable-based theming for things that need explicit
+   color changes beyond what CSS variables cover automatically */
+
+body.dark .pricing-card--free {
+  background: rgba(17, 24, 39, 0.9);
+  border-color: rgba(99, 102, 241, 0.2);
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5), 0 0 1px rgba(255, 255, 255, 0.05);
+}
+
+body.dark .pricing-card--free:hover {
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.7), 0 0 30px rgba(99, 102, 241, 0.25);
+  border-color: rgba(99, 102, 241, 0.4);
+}
+
+body.dark .pricing-badge--free {
+  background: rgba(99, 102, 241, 0.15);
+  color: #a5b4fc;
+  border: 1px solid rgba(99, 102, 241, 0.3);
+}
+
+body.dark .check-icon {
+  color: #34d399;
+  filter: drop-shadow(0 0 4px rgba(52, 211, 153, 0.4));
+}
+
+body.dark .cross-icon {
+  color: #475569;
+}
+
+body.dark .btn-plan-free {
+  background: rgba(99, 102, 241, 0.12);
+  color: #a5b4fc;
+  border-color: rgba(99, 102, 241, 0.3);
+}
+
+body.dark .btn-plan-free:hover {
+  background: rgba(99, 102, 241, 0.25);
+  border-color: #6366f1;
+  color: #ffffff;
+}
+
+body.dark .btn-plan-current {
+  background: rgba(255, 255, 255, 0.05);
+  color: #475569;
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+body.dark .recruiter-banner-card {
+  background: rgba(6, 78, 59, 0.3);
+  border-color: rgba(16, 185, 129, 0.35);
+  box-shadow: 0 4px 25px rgba(16, 185, 129, 0.15);
+}
+
+body.dark .recruiter-banner__icon {
+  color: #34d399;
+  filter: drop-shadow(0 0 10px rgba(52, 211, 153, 0.5));
+}
+
+body.dark .recruiter-banner__title {
+  color: #a7f3d0;
+}
+
+body.dark .recruiter-banner__subtitle {
+  color: #6ee7b7;
+}
+
+body.dark .faq-card-item {
+  background: rgba(17, 24, 39, 0.85);
+  border-color: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
+}
+
+body.dark .faq-card-item:hover {
+  border-color: rgba(168, 85, 247, 0.5);
+  box-shadow: 0 4px 20px rgba(168, 85, 247, 0.3);
+}
+
+body.dark .faq-card-item--open {
+  border-color: #a855f7;
+  background: rgba(17, 24, 39, 0.95);
+}
+
+body.dark .faq-chevron-icon {
+  color: #818cf8;
+}
+
+body.dark .faq-chevron-icon--open {
+  color: #c084fc;
+}

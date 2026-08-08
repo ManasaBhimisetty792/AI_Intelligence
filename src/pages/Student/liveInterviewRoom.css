@@ -1,0 +1,241 @@
+.lir-page {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.lir-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 20px 22px;
+  border: 1px solid var(--color-border);
+  border-radius: 18px;
+  background: var(--color-surface);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.08);
+}
+
+.lir-card-left {
+  flex: 1;
+  min-width: 0;
+}
+
+.lir-title-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.lir-title-row h1 {
+  margin: 0;
+  font-size: 1.2rem;
+  color: var(--color-text);
+}
+
+.lir-status {
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.lir-status.active {
+  background: rgba(34, 197, 94, 0.12);
+  color: #16a34a;
+  border: 1px solid rgba(34, 197, 94, 0.22);
+}
+
+.lir-middle-lines {
+  margin-top: 12px;
+  display: grid;
+  gap: 8px;
+}
+
+.lir-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--color-muted);
+  font-size: 0.92rem;
+}
+
+.lir-line svg {
+  color: var(--color-primary);
+}
+
+.lir-card-right {
+  min-width: 150px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.lir-button {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 11px 18px;
+  border-radius: 12px;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+  transition: 0.2s ease;
+}
+
+.lir-button-primary {
+  border: 0;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: white;
+}
+
+.lir-button-secondary {
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.lir-button-primary:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.lir-button-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.lir-empty-state,
+.lir-state-card {
+  max-width: 560px;
+  margin: 80px auto;
+  padding: 34px 24px;
+  border: 1px solid var(--color-border);
+  border-radius: 18px;
+  background: var(--color-surface);
+  text-align: center;
+}
+
+.lir-empty-icon,
+.lir-error-icon {
+  width: 56px;
+  height: 56px;
+  margin: 0 auto 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 16px;
+  background: rgba(99, 102, 241, 0.12);
+  color: var(--color-primary);
+  font-size: 1.4rem;
+}
+
+.lir-livekit-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: #0b0f19;
+}
+
+.lir-spin {
+  animation: spin 1s linear infinite;
+}
+
+.lir-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.72);
+  backdrop-filter: blur(8px);
+}
+
+.lir-prejoin-modal,
+.lir-feedback-modal {
+  width: 100%;
+  max-width: 720px;
+  max-height: 90vh;
+  overflow: auto;
+  padding: 22px;
+  border-radius: 18px;
+  background: #111827;
+  color: white;
+}
+
+.lir-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.lir-close-button {
+  border: 0;
+  background: transparent;
+  color: white;
+  cursor: pointer;
+  font-size: 1.4rem;
+}
+
+.lir-modal-actions,
+.lir-feedback-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.lir-rating {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.lir-star {
+  border: 0;
+  background: transparent;
+  color: #475569;
+  cursor: pointer;
+  font-size: 1.8rem;
+}
+
+.lir-star.active {
+  color: #f59e0b;
+}
+
+.lir-feedback-modal textarea {
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: 8px;
+  padding: 10px;
+  border-radius: 10px;
+  background: #1f2937;
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  outline: none;
+}
+
+@media (max-width: 768px) {
+  .lir-card {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .lir-card-right {
+    justify-content: flex-start;
+  }
+
+  .lir-button {
+    width: 100%;
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

@@ -1,0 +1,216 @@
+/* ════════════════════════════════════════════════════════════════════
+   ABOUT US PAGE STYLING
+   ════════════════════════════════════════════════════════════════════ */
+
+.about-page-wrapper {
+  overflow-x: hidden;
+}
+
+.about-hero {
+  padding-top: 8rem;
+}
+
+/* ── Mission & Vision ─────────────────────────────────────────────── */
+.mission-vision-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+}
+
+.mission-card {
+  padding: 2.5rem;
+}
+
+.mission-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: var(--radius-lg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  margin-bottom: 1.25rem;
+}
+
+.icon-primary { background: var(--color-primary-light); color: var(--color-primary); }
+.icon-secondary { background: var(--color-secondary-light); color: var(--color-secondary); }
+
+
+.mission-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-bottom: 0.75rem;
+}
+
+.mission-desc {
+  font-size: 1rem;
+  color: var(--color-muted);
+  line-height: 1.65;
+  margin: 0;
+}
+
+/* ── Story Card ───────────────────────────────────────────────────── */
+.story-card {
+  padding: 3rem;
+}
+
+.story-heading {
+  font-size: 2rem;
+  font-weight: 700;
+  margin: 0.75rem 0 1.25rem;
+}
+
+.story-content p {
+  font-size: 1.05rem;
+  color: var(--color-text);
+  line-height: 1.7;
+  margin-bottom: 1rem;
+}
+
+.story-content p:last-child {
+  margin-bottom: 0;
+}
+
+/* ── Core Values ──────────────────────────────────────────────────── */
+.value-card {
+  padding: 2rem;
+}
+
+.value-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-lg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.35rem;
+  margin-bottom: 1.25rem;
+}
+
+.value-title {
+  font-size: 1.2rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+}
+
+.value-desc {
+  font-size: 0.9375rem;
+  color: var(--color-muted);
+  line-height: 1.6;
+  margin: 0;
+}
+
+/* ── Tech Stack ───────────────────────────────────────────────────── */
+.tech-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.5rem;
+}
+
+.tech-card {
+  padding: 1.5rem;
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.tech-check {
+  font-size: 1.35rem;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.tech-name {
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin-bottom: 0.25rem;
+}
+
+.tech-desc {
+  font-size: 0.875rem;
+  color: var(--color-muted);
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* ── Why Dual Box ─────────────────────────────────────────────────── */
+.why-benefits-dual {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+}
+
+.why-benefit-box {
+  padding: 2.5rem;
+}
+
+.why-box-title {
+  font-size: 1.35rem;
+  font-weight: 700;
+  margin-bottom: 1.25rem;
+}
+
+.why-box-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.why-box-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  font-size: 0.95rem;
+  color: var(--color-text);
+  line-height: 1.5;
+}
+
+/* ── Roadmap Timeline ─────────────────────────────────────────────── */
+.roadmap-timeline {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1.5rem;
+}
+
+.roadmap-item {
+  padding: 1.75rem;
+  position: relative;
+}
+
+.roadmap-phase-badge {
+  font-family: var(--font-display);
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--color-primary);
+  background: rgba(79, 70, 229, 0.1);
+  padding: 0.2rem 0.6rem;
+  border-radius: var(--radius-full);
+  display: inline-block;
+  margin-bottom: 0.75rem;
+}
+
+.roadmap-title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  margin-bottom: 0.4rem;
+}
+
+.roadmap-desc {
+  font-size: 0.875rem;
+  color: var(--color-muted);
+  line-height: 1.5;
+  margin: 0;
+}
+
+@media (max-width: 900px) {
+  .mission-vision-grid,
+  .why-benefits-dual {
+    grid-template-columns: 1fr;
+  }
+  .story-card {
+    padding: 2rem;
+  }
+}

@@ -1,0 +1,34 @@
+/* Student Reports CSS */
+.reports-comparison-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+}
+
+@media (max-width: 992px) {
+  .reports-comparison-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.report-card-comparison {
+  border-radius: var(--radius-xl, 20px);
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  padding: 1.5rem;
+}
+
+.chart-placeholder-box {
+  height: 220px;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px dashed rgba(255, 255, 255, 0.15);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-muted);
+  text-align: center;
+  padding: 1rem;
+}
