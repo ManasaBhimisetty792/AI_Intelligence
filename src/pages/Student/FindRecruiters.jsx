@@ -964,7 +964,7 @@ export default function FindRecruiters() {
               />
             </div>
 
-            <select
+            {/* <select
               value={selectedSort}
               onChange={(event) =>
                 setSelectedSort(
@@ -988,7 +988,7 @@ export default function FindRecruiters() {
               <option value="company">
                 Company Name
               </option>
-            </select>
+            </select> */}
           </div>
         </section>
 
