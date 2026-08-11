@@ -94,6 +94,7 @@ export const StudentProfile = () => {
 
   const photoInputRef = useRef(null);
   const resumeInputRef = useRef(null);
+  const editorSectionRef = useRef(null);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -108,6 +109,17 @@ export const StudentProfile = () => {
   const [resumeFileName, setResumeFileName] = useState('');
   const [resumeFileUrl, setResumeFileUrl] = useState('');
   const [profileExists, setProfileExists] = useState(false);
+
+  const handleEditClick = () => {
+    if (!editMode) {
+      setEditMode(true);
+      setTimeout(() => {
+        editorSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
+    } else {
+      setEditMode(false);
+    }
+  };
 
   const profileCompletion = useMemo(
     () => getProfileCompletion(formData, skills, resumeFileName),
@@ -462,257 +474,349 @@ export const StudentProfile = () => {
   return (
     <DashboardLayout title="My Profile">
       <main className="student-profile-page">
-        <section className="profile-hero-card">
-          <div className="profile-hero-background">
-            <div className="hero-orb hero-orb-one" />
-            <div className="hero-orb hero-orb-two" />
-            <HiSparkles className="hero-sparkle" />
-          </div>
 
-          <div className="profile-hero-content">
-            <div className="profile-identity">
-              <div className="profile-avatar-container">
-                {photoPreview ? (
-                  <img
-                    src={photoPreview}
-                    alt={formData.fullName || 'Profile'}
-                    className="profile-avatar"
-                  />
-                ) : (
-                  <div className="profile-avatar-placeholder">
-                    <FiUser />
-                  </div>
-                )}
+        {/* =====================================================
+            REAL-WORLD DEVELOPER PROFILE LAYOUT
+        ====================================================== */}
+        <div className="profile-layout-grid">
 
-                {uploadingAvatar && (
-                  <div className="avatar-uploading">
-                    <FiLoader className="spin-animation" />
-                  </div>
-                )}
+          {/* ── LEFT SIDEBAR COLUMN ────────────────────────────── */}
+          <aside className="profile-sidebar-column">
+
+            {/* MAIN IDENTITY CARD */}
+            <div className="profile-card identity-card">
+              {/* COVER BANNER */}
+              <div className="identity-banner">
+                <div className="banner-glow-orb" />
+                <span className="banner-badge">STUDENT PORTAL</span>
               </div>
 
-              <div className="profile-heading">
-                <div className="profile-name-row">
-                  <h1>{formData.fullName || 'Unnamed profile'}</h1>
+              {/* AVATAR */}
+              <div className="identity-avatar-wrapper">
+                <div className="identity-avatar-container">
+                  {photoPreview ? (
+                    <img
+                      src={photoPreview}
+                      alt={formData.fullName || 'Profile'}
+                      className="identity-avatar-img"
+                    />
+                  ) : (
+                    <div className="identity-avatar-placeholder">
+                      <FiUser />
+                    </div>
+                  )}
+                  <span className="identity-online-dot" title="Active Account" />
+
+                  {uploadingAvatar && (
+                    <div className="avatar-uploading">
+                      <FiLoader className="spin-animation" />
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* USER INFO */}
+              <div className="identity-info-body">
+                <div className="identity-name-group">
+                  <h2>{formData.fullName || 'Unnamed Student'}</h2>
                   <MembershipBadge />
                 </div>
 
-                <p className="profile-username">
+                <p className="identity-handle">
                   {formData.username ? `@${formData.username}` : 'Username not set'}
                 </p>
 
-                <div className="profile-status-row">
-                  <span className="status-pill">
-                    <FiCheckCircle />
-                    {formData.currentStatus || 'Status not set'}
+                <div className="identity-tags">
+                  <span className="status-chip">
+                    <span className="pulse-dot" />
+                    {formData.currentStatus || 'Active Candidate'}
                   </span>
 
                   {formData.location && (
-                    <span className="location-text">
-                      <FiMapPin />
+                    <span className="location-chip">
+                      <FiMapPin size={13} />
                       {formData.location}
                     </span>
                   )}
                 </div>
+
+                {/* EDIT BUTTON */}
+                <button
+                  type="button"
+                  className="profile-edit-btn"
+                  onClick={handleEditClick}
+                >
+                  <FiEdit3 size={15} />
+                  {editMode ? 'Close Editor' : 'Edit Profile'}
+                </button>
               </div>
             </div>
 
-            <button
-              type="button"
-              className="profile-edit-button"
-              onClick={() => setEditMode((previous) => !previous)}
-            >
-              <FiEdit3 />
-              {editMode ? 'Close editor' : 'Edit profile'}
-            </button>
-          </div>
+            {/* CONTACT & SOCIAL LINKS CARD */}
+            <div className="profile-card links-card">
+              <h3 className="card-section-title">
+                <FiBriefcase size={16} /> Contact & Socials
+              </h3>
 
-          <div className="profile-hero-footer">
-            <div className="profile-stat">
-              <strong>{skills.length}</strong>
-              <span>Skills</span>
-            </div>
+              <div className="links-list">
+                {formData.email && (
+                  <a href={`mailto:${formData.email}`} className="social-link-item">
+                    <div className="link-icon email-icon"><FiMail /></div>
+                    <div className="link-text">
+                      <small>Email</small>
+                      <span>{formData.email}</span>
+                    </div>
+                  </a>
+                )}
 
-            <div className="profile-stat">
-              <strong>{resumeFileName ? '1' : '0'}</strong>
-              <span>Resume</span>
-            </div>
+                {formData.phone && (
+                  <a href={`tel:${formData.phone}`} className="social-link-item">
+                    <div className="link-icon phone-icon"><FiPhone /></div>
+                    <div className="link-text">
+                      <small>Phone</small>
+                      <span>{formData.phone}</span>
+                    </div>
+                  </a>
+                )}
 
-            <div className="profile-stat">
-              <strong>{profileCompletion}%</strong>
-              <span>Complete</span>
-            </div>
+                {formData.githubUrl && (
+                  <a
+                    href={normalizeUrl(formData.githubUrl)}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="social-link-item"
+                  >
+                    <div className="link-icon github-icon"><FiGithub /></div>
+                    <div className="link-text">
+                      <small>GitHub</small>
+                      <span>{formData.githubUrl.replace(/^https?:\/\//, '')}</span>
+                    </div>
+                    <FiExternalLink className="external-arrow" />
+                  </a>
+                )}
 
-            <div className="profile-progress">
-              <div className="progress-label">
-                <span>Profile completion</span>
-                <strong>{profileCompletion}%</strong>
+                {formData.linkedinUrl && (
+                  <a
+                    href={normalizeUrl(formData.linkedinUrl)}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="social-link-item"
+                  >
+                    <div className="link-icon linkedin-icon"><FiLinkedin /></div>
+                    <div className="link-text">
+                      <small>LinkedIn</small>
+                      <span>{formData.linkedinUrl.replace(/^https?:\/\//, '')}</span>
+                    </div>
+                    <FiExternalLink className="external-arrow" />
+                  </a>
+                )}
+
+                {formData.portfolioUrl && (
+                  <a
+                    href={normalizeUrl(formData.portfolioUrl)}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="social-link-item"
+                  >
+                    <div className="link-icon globe-icon"><FiGlobe /></div>
+                    <div className="link-text">
+                      <small>Portfolio</small>
+                      <span>{formData.portfolioUrl.replace(/^https?:\/\//, '')}</span>
+                    </div>
+                    <FiExternalLink className="external-arrow" />
+                  </a>
+                )}
+
+                {!formData.email &&
+                  !formData.phone &&
+                  !formData.githubUrl &&
+                  !formData.linkedinUrl &&
+                  !formData.portfolioUrl && (
+                    <p className="empty-text">No contact details provided.</p>
+                  )}
               </div>
-              <div className="progress-track">
+            </div>
+
+            {/* RESUME CARD */}
+            <div className="profile-card resume-card">
+              <h3 className="card-section-title">
+                <FiFileText size={16} /> Attached CV / Resume
+              </h3>
+
+              {resumeFileName ? (
+                <div className="resume-box">
+                  <div className="resume-file-icon">
+                    <FiFileText size={24} />
+                  </div>
+                  <div className="resume-info">
+                    <strong className="resume-name">{resumeFileName}</strong>
+                    <span className="resume-status-badge">
+                      <FiCheckCircle size={12} /> Verified Upload
+                    </span>
+                  </div>
+                  {resumeFileUrl ? (
+                    <a
+                      href={resumeFileUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="resume-download-btn"
+                      title="Open Resume"
+                    >
+                      <FiExternalLink size={16} />
+                    </a>
+                  ) : null}
+                </div>
+              ) : (
+                <div className="resume-empty-box">
+                  <p>No resume uploaded yet.</p>
+                  <button
+                    type="button"
+                    className="upload-resume-shortcut"
+                    onClick={() => {
+                      setEditMode(true);
+                      setTimeout(() => {
+                        resumeInputRef.current?.scrollIntoView({ behavior: 'smooth' });
+                      }, 200);
+                    }}
+                  >
+                    <FiUploadCloud size={14} /> Upload Resume
+                  </button>
+                </div>
+              )}
+            </div>
+
+          </aside>
+
+
+          {/* ── RIGHT MAIN CONTENT COLUMN ─────────────────────── */}
+          <main className="profile-main-column">
+
+            {/* PROFILE STRENGTH BANNER */}
+            <div className="profile-card strength-card">
+              <div className="strength-header">
+                <div className="strength-title">
+                  <HiSparkles className="sparkle-icon" />
+                  <div>
+                    <h3>Profile Strength Score</h3>
+                    <p>Complete your details to increase visibility to recruiters</p>
+                  </div>
+                </div>
+                <div className="strength-percentage">{profileCompletion}%</div>
+              </div>
+
+              <div className="strength-progress-bar">
                 <div
-                  className="progress-value"
+                  className="strength-progress-fill"
                   style={{ width: `${profileCompletion}%` }}
                 />
               </div>
             </div>
-          </div>
-        </section>
 
-        <section className="profile-content-grid">
-          <div className="profile-card summary-card">
-            <div className="card-heading">
-              <div className="heading-icon">
-                <FiUser />
+            {/* ABOUT ME SECTION */}
+            <div className="profile-card about-card">
+              <div className="card-header-bar">
+                <h3 className="card-section-title">
+                  <FiUser size={18} /> About Me
+                </h3>
               </div>
-              <div>
-                <h2>About me</h2>
-                <p>Professional profile summary</p>
+
+              <div className="bio-container">
+                {formData.bio ? (
+                  <p className="bio-text">{formData.bio}</p>
+                ) : (
+                  <div className="empty-placeholder">
+                    <p>No professional bio added yet.</p>
+                    <button
+                      type="button"
+                      className="inline-action-btn"
+                      onClick={() => setEditMode(true)}
+                    >
+                      + Add Bio
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
 
-            <p className="profile-bio">
-              {formData.bio || 'No professional bio added yet.'}
-            </p>
-
-            <div className="skills-section">
-              <div className="section-label">
-                <FiTag />
-                Skills and technologies
+            {/* SKILLS & TECHNOLOGIES SECTION */}
+            <div className="profile-card skills-card">
+              <div className="card-header-bar">
+                <h3 className="card-section-title">
+                  <FiTag size={18} /> Skills & Technical Expertise
+                </h3>
+                <span className="skill-count-badge">{skills.length} Skills</span>
               </div>
 
               {skills.length > 0 ? (
-                <div className="skills-list">
+                <div className="skills-grid">
                   {skills.map((skill) => (
-                    <span className="display-skill" key={skill}>
-                      {skill}
-                    </span>
+                    <div className="skill-badge-card" key={skill}>
+                      <span className="skill-dot" />
+                      <span className="skill-name">{skill}</span>
+                    </div>
                   ))}
                 </div>
               ) : (
-                <p className="muted-text">No skills added yet.</p>
+                <div className="empty-placeholder">
+                  <p>No skills added to your profile yet.</p>
+                  <button
+                    type="button"
+                    className="inline-action-btn"
+                    onClick={() => setEditMode(true)}
+                  >
+                    + Add Skills
+                  </button>
+                </div>
               )}
             </div>
-          </div>
 
-          <div className="profile-card contact-card">
-            <div className="card-heading">
-              <div className="heading-icon">
-                <FiBriefcase />
+            {/* CAREER READINESS CARD */}
+            <div className="profile-card readiness-card">
+              <div className="card-header-bar">
+                <h3 className="card-section-title">
+                  <FiCheckCircle size={18} /> Career & Interview Readiness
+                </h3>
               </div>
-              <div>
-                <h2>Contact and links</h2>
-                <p>Information saved in your profile</p>
+
+              <div className="readiness-grid">
+                <div className="readiness-item">
+                  <div className="readiness-icon check-green">
+                    <FiCheckCircle />
+                  </div>
+                  <div>
+                    <h4>Live Interview Studio</h4>
+                    <p>Ready to join recruiter video calls</p>
+                  </div>
+                </div>
+
+                <div className="readiness-item">
+                  <div className="readiness-icon check-indigo">
+                    <HiSparkles />
+                  </div>
+                  <div>
+                    <h4>AI Mock Practice</h4>
+                    <p>Access AI feedback report generator</p>
+                  </div>
+                </div>
+
+                <div className="readiness-item">
+                  <div className="readiness-icon check-teal">
+                    <FiFileText />
+                  </div>
+                  <div>
+                    <h4>ATS Resume Screening</h4>
+                    <p>ATS compatible profile structure</p>
+                  </div>
+                </div>
               </div>
             </div>
 
-            <div className="contact-list">
-              {formData.email && (
-                <a
-                  href={`mailto:${formData.email}`}
-                  className="contact-item"
-                >
-                  <FiMail />
-                  <span>{formData.email}</span>
-                </a>
-              )}
+          </main>
 
-              {formData.phone && (
-                <a href={`tel:${formData.phone}`} className="contact-item">
-                  <FiPhone />
-                  <span>{formData.phone}</span>
-                </a>
-              )}
-
-              {formData.githubUrl && (
-                <a
-                  href={normalizeUrl(formData.githubUrl)}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="contact-item"
-                >
-                  <FiGithub />
-                  <span>GitHub</span>
-                  <FiExternalLink className="link-arrow" />
-                </a>
-              )}
-
-              {formData.linkedinUrl && (
-                <a
-                  href={normalizeUrl(formData.linkedinUrl)}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="contact-item"
-                >
-                  <FiLinkedin />
-                  <span>LinkedIn</span>
-                  <FiExternalLink className="link-arrow" />
-                </a>
-              )}
-
-              {formData.portfolioUrl && (
-                <a
-                  href={normalizeUrl(formData.portfolioUrl)}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="contact-item"
-                >
-                  <FiGlobe />
-                  <span>Portfolio</span>
-                  <FiExternalLink className="link-arrow" />
-                </a>
-              )}
-
-              {formData.website && (
-                <a
-                  href={normalizeUrl(formData.website)}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="contact-item"
-                >
-                  <FiGlobe />
-                  <span>Website</span>
-                  <FiExternalLink className="link-arrow" />
-                </a>
-              )}
-
-              {!formData.email &&
-                !formData.phone &&
-                !formData.githubUrl &&
-                !formData.linkedinUrl &&
-                !formData.portfolioUrl &&
-                !formData.website && (
-                  <p className="muted-text">
-                    No contact information added yet.
-                  </p>
-                )}
-            </div>
-
-            {resumeFileName && (
-              <a
-                href={resumeFileUrl || '#'}
-                target={resumeFileUrl ? '_blank' : undefined}
-                rel={resumeFileUrl ? 'noreferrer' : undefined}
-                className={`resume-display ${
-                  !resumeFileUrl ? 'disabled-link' : ''
-                }`}
-              >
-                <FiFileText />
-                <span>
-                  <strong>{resumeFileName}</strong>
-                  <small>
-                    {resumeFileUrl
-                      ? 'Open uploaded resume'
-                      : 'Resume URL unavailable'}
-                  </small>
-                </span>
-                <FiExternalLink />
-              </a>
-            )}
-          </div>
-        </section>
+        </div>
 
         {editMode && (
-          <section className="profile-editor-card">
+          <section ref={editorSectionRef} className="profile-editor-card">
             <div className="editor-header">
               <div>
                 <h2>Edit profile details</h2>

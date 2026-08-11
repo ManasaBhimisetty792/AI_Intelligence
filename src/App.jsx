@@ -120,6 +120,10 @@ const StudentInterviewHistory = lazy(() =>
   import('./pages/Student/InterviewHistory')
 );
 
+const StudentLiveInterviewRoom = lazy(() =>
+  import('./pages/Student/StudentLiveInterviewRoom')
+);
+
 const StudentReports = lazy(() =>
   import('./pages/Student/StudentReports')
 );
@@ -505,9 +509,19 @@ const App = () => {
                     }
                   /> */}
                   <Route
+                    path="/student/live-interview"
+                    element={
+                      <ProtectedRoute allowedRoles={['student']}>
+                        <StudentLiveInterviewRoom />
+                      </ProtectedRoute>
+                    }
+                  />
+
+                  <Route
     path="/student/live-interview/:requestId"
     element={<ZoomMeeting />}
 />
+
 
                   <Route
                     path="/student/interview-history"
