@@ -19,12 +19,25 @@ export const AuthProvider = ({ children }) => {
       try {
         if (isSupabaseConfigured()) {
           const { data } = await supabase.auth.getSession();
-          if (data.session) {
-            setSession(data.session);
-            // getCurrentUser reads role from public.profiles, not auth metadata
-            const currentUser = await authService.getCurrentUser();
-            if (isMounted && currentUser) setUser(currentUser);
-          }
+         if (data.session) {
+  setSession(data.session);
+
+  tokenStorage.set({
+    access: data.session.access_token,
+    refresh: data.session.refresh_token,
+  });
+
+  const currentUser = await authService.getCurrentUser();
+  if (isMounted && currentUser) {
+    setUser(currentUser);
+
+    tokenStorage.set({
+      access: data.session.access_token,
+      refresh: data.session.refresh_token,
+      user: currentUser,
+    });
+  }
+}
         } else {
           const localUser = tokenStorage.user;
           if (isMounted) setUser(localUser || null);
@@ -43,19 +56,34 @@ export const AuthProvider = ({ children }) => {
       const { data: listener } = supabase.auth.onAuthStateChange(async (event, newSession) => {
         setSession(newSession);
 
-        if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
-          // Always fetch from public.profiles to get the persisted role
-          const freshUser = await authService.getCurrentUser();
-          if (isMounted && freshUser) {
-            setUser(freshUser);
-            if (isMounted) setLoading(false);
-          }
-        } else if (event === 'SIGNED_OUT') {
-          if (isMounted) {
-            setUser(null);
-            setLoading(false);
-          }
-        }
+if (
+  event === 'SIGNED_IN' ||
+  event === 'TOKEN_REFRESHED' ||
+  event === 'USER_UPDATED'
+) {
+  tokenStorage.set({
+    access: newSession?.access_token,
+    refresh: newSession?.refresh_token,
+  });
+
+  const freshUser = await authService.getCurrentUser();
+  if (isMounted && freshUser) {
+    setUser(freshUser);
+
+    tokenStorage.set({
+      access: newSession?.access_token,
+      refresh: newSession?.refresh_token,
+      user: freshUser,
+    });
+    setLoading(false);
+  }
+} else if (event === 'SIGNED_OUT') {
+  if (isMounted) {
+    setUser(null);
+    setLoading(false);
+  }
+  tokenStorage.clear();
+}
       });
       authSubscription = listener;
     }

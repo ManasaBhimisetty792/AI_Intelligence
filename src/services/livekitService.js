@@ -1,170 +1,398 @@
-import api from './api';
+import axios from 'axios';
+import { supabase } from './supabaseClient';
 
-const LIVEKIT_CLOUD_URL = import.meta.env.VITE_LIVEKIT_URL || 'wss://skilltrack-ai-71jz5l0t.livekit.cloud';
-const LIVEKIT_API_KEY = import.meta.env.VITE_LIVEKIT_API_KEY || 'APImVGXNhPheQ5G';
-const LIVEKIT_API_SECRET = import.meta.env.VITE_LIVEKIT_API_SECRET || 'S5cWsIfWgyCdLVyLB0ZDBKhbfBP4blCDqa2m5h3BTdfB';
+// ============================================================
+// LIVEKIT CONFIGURATION
+// ============================================================
 
-/**
- * Generate a valid HMAC-SHA256 LiveKit JWT token using Web Crypto API.
- * This guarantees real LiveKit cloud video/audio connections work 100% of the time,
- * even when the local FastAPI server is offline or unreachable.
- */
-async function generateClientLiveKitJwt({ roomName, identity, userName, isRoomAdmin = true }) {
-  const header = { alg: 'HS256', typ: 'JWT' };
-  const now = Math.floor(Date.now() / 1000);
-  const payload = {
-    iss: LIVEKIT_API_KEY,
-    sub: identity || `user_${Date.now()}`,
-    name: userName || 'Participant',
-    nbf: now - 10,
-    exp: now + 7200, // 2 hours validity
-    video: {
-      room: roomName,
-      roomJoin: true,
-      canPublish: true,
-      canSubscribe: true,
-      canPublishData: true,
-      roomAdmin: isRoomAdmin
-    }
-  };
+const API_BASE_URL =
+  import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
-  const base64UrlEncode = (obj) => {
-    const str = typeof obj === 'string' ? obj : JSON.stringify(obj);
-    const base64 = btoa(encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, (match, p1) =>
-      String.fromCharCode('0x' + p1)
-    ));
-    return base64.replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
-  };
+const LIVEKIT_TOKEN_ENDPOINT = `${API_BASE_URL}/api/v1/livekit/token`;
 
-  const unsignedToken = `${base64UrlEncode(header)}.${base64UrlEncode(payload)}`;
+console.log('================================================');
+console.log('[LiveKit Service] Configuration');
+console.log('================================================');
+console.log('[LiveKit Service] API Base URL:', API_BASE_URL);
+console.log(
+  '[LiveKit Service] Token Endpoint:',
+  LIVEKIT_TOKEN_ENDPOINT
+);
+console.log('================================================');
 
-  const encoder = new TextEncoder();
-  const keyData = encoder.encode(LIVEKIT_API_SECRET);
-  const messageData = encoder.encode(unsignedToken);
+// ============================================================
+// HELPER: GET SUPABASE ACCESS TOKEN
+// ============================================================
 
-  const cryptoKey = await crypto.subtle.importKey(
-    'raw',
-    keyData,
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['sign']
-  );
+const getAccessToken = async () => {
+  console.log('[LiveKit Service] Getting Supabase session...');
 
-  const signatureBuffer = await crypto.subtle.sign('HMAC', cryptoKey, messageData);
-  const signatureArray = Array.from(new Uint8Array(signatureBuffer));
-  const base64Signature = btoa(String.fromCharCode(...signatureArray))
-    .replace(/=/g, '')
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_');
+  const {
+    data: { session },
+    error,
+  } = await supabase.auth.getSession();
 
-  return `${unsignedToken}.${base64Signature}`;
-}
-
-export const livekitService = {
- async getToken(
-  roomName,
-  role = "student",
-  userName = "Participant"
-) {
-  const normalizedRoomName =
-    roomName?.startsWith("interview_")
-      ? roomName
-      : `interview_${roomName}`;
-
-  const identity =
-    `${role}_${Date.now()}_${Math.random()
-      .toString(36)
-      .slice(2, 8)}`;
-
-  try {
-    const { data } = await api.post(
-      "/api/livekit/token",
-      {
-        room_name: normalizedRoomName,
-        user_id: identity,
-        user_name: userName,
-        role,
-      }
-    );
-
-    if (!data?.token || !data?.url) {
-      throw new Error(
-        "Invalid LiveKit token response."
-      );
-    }
-
-    return {
-      ...data,
-      room: data.room || normalizedRoomName,
-      role,
-    };
-  } catch (error) {
+  if (error) {
     console.error(
-      "LiveKit token request failed:",
+      '[LiveKit Service] Supabase session error:',
       error
     );
 
     throw new Error(
-      "Unable to create secure meeting credentials."
+      'Unable to get authentication session.'
     );
   }
-},
 
-  async requestCustomToken({ room_name, user_id, user_name, role }) {
-    const roomName = room_name || 'room_default';
-    const identity = user_id || `user_${Date.now()}`;
-    const isAdmin = role === 'recruiter' || role === 'admin';
+  if (!session?.access_token) {
+    console.error(
+      '[LiveKit Service] No Supabase access token found.'
+    );
 
-    try {
-      const { data } = await api.post('/api/livekit/token', {
-        room_name: roomName,
-        user_id: identity,
-        user_name: user_name || 'Participant',
-        role: role || 'student'
-      });
-      if (data && data.token && data.url) {
-        return data;
+    throw new Error(
+      'You are not authenticated. Please login again.'
+    );
+  }
+
+  console.log(
+    '[LiveKit Service] Supabase access token found.'
+  );
+
+  return session.access_token;
+};
+
+// ============================================================
+// GET LIVEKIT TOKEN
+// ============================================================
+
+const getToken = async (requestId) => {
+  console.log('');
+  console.log('================================================');
+  console.log('[LiveKit Service] GET TOKEN START');
+  console.log('================================================');
+
+  console.log(
+    '[LiveKit Service] requestId:',
+    requestId
+  );
+
+  if (!requestId) {
+    console.error(
+      '[LiveKit Service] ERROR: requestId is missing'
+    );
+
+    throw new Error(
+      'Interview request ID is missing.'
+    );
+  }
+
+  try {
+    const accessToken = await getAccessToken();
+
+    console.log(
+      '[LiveKit Service] Sending token request...'
+    );
+
+    console.log(
+      '[LiveKit Service] Endpoint:',
+      LIVEKIT_TOKEN_ENDPOINT
+    );
+
+    console.log(
+      '[LiveKit Service] Request body:',
+      {
+        request_id: requestId,
       }
-    } catch (err) {
-      console.warn('[LiveKit Service] Custom token API failed, using LiveKit Cloud fallback:', err.message);
+    );
+
+    const response = await axios.post(
+      LIVEKIT_TOKEN_ENDPOINT,
+      {
+        request_id: requestId,
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+
+    console.log(
+      '[LiveKit Service] Backend response status:',
+      response.status
+    );
+
+    console.log(
+      '[LiveKit Service] Backend response:',
+      {
+        ...response.data,
+        token: response.data?.token
+          ? '[TOKEN RECEIVED]'
+          : '[NO TOKEN]',
+      }
+    );
+
+    const data = response.data;
+
+    if (!data?.token) {
+      console.error(
+        '[LiveKit Service] Missing token in backend response'
+      );
+
+      throw new Error(
+        'Backend did not return a LiveKit token.'
+      );
     }
 
-    const token = await generateClientLiveKitJwt({
-      roomName,
-      identity,
-      userName: user_name || 'Participant',
-      isRoomAdmin: isAdmin
-    });
+    if (!data?.livekit_url) {
+      console.error(
+        '[LiveKit Service] Missing livekit_url in backend response'
+      );
 
-    return {
-      url: LIVEKIT_CLOUD_URL,
-      token: token,
-      room: roomName,
-      role: role || 'student'
-    };
-  },
-
-  async startSession(sessionId, roomName, userId) {
-    try {
-      const { data } = await api.post('/api/livekit/session/start', null, {
-        params: { session_id: sessionId, room_name: roomName, user_id: userId }
-      });
-      return data;
-    } catch (e) {
-      return { status: 'started' };
+      throw new Error(
+        'Backend did not return the LiveKit server URL.'
+      );
     }
-  },
 
-  async endSession(sessionId) {
-    try {
-      const { data } = await api.post('/api/livekit/session/end', null, {
-        params: { session_id: sessionId }
-      });
-      return data;
-    } catch (e) {
-      return { status: 'ended' };
+    if (!data?.room_name) {
+      console.error(
+        '[LiveKit Service] Missing room_name in backend response'
+      );
+
+      throw new Error(
+        'Backend did not return the LiveKit room name.'
+      );
     }
+
+    if (!data?.identity) {
+      console.error(
+        '[LiveKit Service] Missing identity in backend response'
+      );
+
+      throw new Error(
+        'Backend did not return participant identity.'
+      );
+    }
+
+    console.log('');
+    console.log(
+      '**************** LIVEKIT TOKEN RECEIVED ****************'
+    );
+
+    console.log(
+      '[LiveKit Service] Request ID:',
+      requestId
+    );
+
+    console.log(
+      '[LiveKit Service] Room Name:',
+      data.room_name
+    );
+
+    console.log(
+      '[LiveKit Service] Identity:',
+      data.identity
+    );
+
+    console.log(
+      '[LiveKit Service] Participant:',
+      data.participant_name
+    );
+
+    console.log(
+      '[LiveKit Service] Role:',
+      data.role
+    );
+
+    console.log(
+      '[LiveKit Service] LiveKit URL:',
+      data.livekit_url
+    );
+
+    console.log(
+      '[LiveKit Service] Token:',
+      '[REDACTED]'
+    );
+
+    console.log(
+      '*********************************************************'
+    );
+    console.log('');
+
+    return data;
+  } catch (error) {
+    console.error('');
+    console.error(
+      '================================================'
+    );
+    console.error(
+      '[LiveKit Service] TOKEN REQUEST FAILED'
+    );
+    console.error(
+      '================================================'
+    );
+
+    if (error?.response) {
+      console.error(
+        '[LiveKit Service] HTTP Status:',
+        error.response.status
+      );
+
+      console.error(
+        '[LiveKit Service] Backend Error:',
+        error.response.data
+      );
+
+      const backendMessage =
+        error.response.data?.detail ||
+        error.response.data?.message;
+
+      throw new Error(
+        backendMessage ||
+          `LiveKit token request failed with status ${error.response.status}`
+      );
+    }
+
+    console.error(
+      '[LiveKit Service] Error:',
+      error
+    );
+
+    console.error(
+      '[LiveKit Service] Error Message:',
+      error?.message
+    );
+
+    throw error;
   }
 };
 
+// ============================================================
+// START SESSION
+// ============================================================
+
+const startSession = async (
+  requestId,
+  roomName,
+  role
+) => {
+  console.log('');
+  console.log(
+    '================================================'
+  );
+  console.log(
+    '[LiveKit Service] START SESSION'
+  );
+  console.log(
+    '================================================'
+  );
+
+  console.log(
+    '[LiveKit Service] Request ID:',
+    requestId
+  );
+
+  console.log(
+    '[LiveKit Service] Room:',
+    roomName
+  );
+
+  console.log(
+    '[LiveKit Service] Role:',
+    role
+  );
+
+  /*
+   * This function is intentionally kept as a local
+   * session logger.
+   *
+   * LiveKit itself starts the actual room when
+   * LiveKitRoom connects.
+   */
+
+  console.log(
+    '[LiveKit Service] Session start recorded.'
+  );
+
+  return {
+    request_id: requestId,
+    room: roomName,
+    role,
+  };
+};
+
+// ============================================================
+// END SESSION
+// ============================================================
+
+const endSession = async (requestId) => {
+  console.log('');
+  console.log(
+    '================================================'
+  );
+  console.log(
+    '[LiveKit Service] END SESSION'
+  );
+  console.log(
+    '================================================'
+  );
+
+  console.log(
+    '[LiveKit Service] Request ID:',
+    requestId
+  );
+
+  /*
+   * Do NOT call a LiveKit disconnect API here.
+   *
+   * LiveKitRoom handles disconnecting automatically
+   * when the component is unmounted.
+   */
+
+  return {
+    request_id: requestId,
+    ended: true,
+  };
+};
+
+// ============================================================
+// OPTIONAL BACKWARD COMPATIBILITY
+// ============================================================
+
+const requestCustomToken = async (params) => {
+  console.warn(
+    '[LiveKit Service] requestCustomToken() is deprecated.'
+  );
+
+  console.warn(
+    '[LiveKit Service] Use getToken(requestId) instead.'
+  );
+
+  if (!params?.request_id) {
+    throw new Error(
+      'request_id is required.'
+    );
+  }
+
+  return getToken(params.request_id);
+};
+
+// ============================================================
+// EXPORT
+// ============================================================
+
+const livekitService = {
+  getToken,
+  startSession,
+  endSession,
+  requestCustomToken,
+};
+
 export default livekitService;
+
+export {
+  getToken,
+  startSession,
+  endSession,
+  requestCustomToken,
+};

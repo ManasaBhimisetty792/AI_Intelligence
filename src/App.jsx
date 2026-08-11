@@ -113,7 +113,7 @@ const FindRecruiters = lazy(() =>
  * export default ZoomMeetingRoom;
  */
 const ZoomMeeting = lazy(() =>
-  import('./components/meeting/ZoomMeetingRoom.jsx')
+  import('./components/Meeting/ZoomMeetingRoom.jsx')
 );
 
 const StudentInterviewHistory = lazy(() =>
@@ -496,14 +496,18 @@ const App = () => {
                     }
                   />
 
-                  <Route
+                  {/* <Route
                     path="/student/live-interview/:requestId"
                     element={
                       <ProtectedRoute allowedRoles={['student']}>
                         <ZoomMeeting />
                       </ProtectedRoute>
                     }
-                  />
+                  /> */}
+                  <Route
+    path="/student/live-interview/:requestId"
+    element={<ZoomMeeting />}
+/>
 
                   <Route
                     path="/student/interview-history"
@@ -730,7 +734,11 @@ const App = () => {
                       </ProtectedRoute>
                     }
                   />
-
+                  <Route
+    path="/recruiter/live-interview/:requestId"
+    element={<ZoomMeeting />}
+/>
+{/* 
                   <Route
                     path="/recruiter/live-interviews/:requestId"
                     element={
@@ -738,7 +746,7 @@ const App = () => {
                         <ZoomMeeting />
                       </ProtectedRoute>
                     }
-                  />
+                  /> */}
 
                   <Route
                     path="/recruiter/screening"

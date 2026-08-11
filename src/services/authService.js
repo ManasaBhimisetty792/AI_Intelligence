@@ -477,9 +477,10 @@ export const authService = {
       const adminUser = MOCK_USERS.admin;
 
       tokenStorage.set({
-        user: adminUser,
-        access: '',
-      });
+  user: adminUser,
+  access: 'mock_admin_access_token',
+  refresh: 'mock_admin_refresh_token',
+});
 
       return adminUser;
     }
@@ -517,14 +518,15 @@ export const authService = {
       email.split('@')[0];
 
     tokenStorage.set({
-      user: {
-        id: data.user.id,
-        email: data.user.email,
-        name: resolvedName,
-        role: resolvedRole,
-      },
-      access: data.session.access_token,
-    });
+  user: {
+    id: data.user.id,
+    email: data.user.email,
+    name: resolvedName,
+    role: resolvedRole,
+  },
+  access: data.session.access_token,
+  refresh: data.session.refresh_token,
+});
 
     const freshUser = await this.getCurrentUser();
 

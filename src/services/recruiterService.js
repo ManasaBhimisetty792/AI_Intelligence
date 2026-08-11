@@ -104,26 +104,27 @@ const getStudentContact = async (
     data,
     error,
   } = await supabase
-    .from("student_profiles")
-    .select("email, full_name")
-    .eq("user_id", studentUserId)
+    .from("profiles")
+    .select("email, full_name, name")
+    .eq("id", studentUserId)
     .maybeSingle();
 
-  if (error) {
-    console.warn(
-      "Student contact lookup failed:",
-      error
-    );
+  if (error || !data) {
+    const { data: candidateData } = await supabase
+      .from("candidate_profiles")
+      .select("email, full_name")
+      .eq("user_id", studentUserId)
+      .maybeSingle();
 
     return {
-      email: "",
-      name: "Candidate",
+      email: candidateData?.email || "",
+      name: candidateData?.full_name || "Candidate",
     };
   }
 
   return {
     email: data?.email || "",
-    name: data?.full_name || "Candidate",
+    name: data?.full_name || data?.name || "Candidate",
   };
 };
 
