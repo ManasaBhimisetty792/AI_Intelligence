@@ -1,14 +1,3 @@
-/**
- * Central Axios instance.
- *
- * Features:
- * - Attaches the access token to every request.
- * - Refreshes the access token after a 401 response.
- * - Replays the original request once.
- * - Queues other failed requests while refreshing.
- * - Clears authentication storage when refresh fails.
- */
-
 import axios from 'axios';
 
 export const API_BASE_URL =
@@ -23,11 +12,15 @@ const STORAGE_KEYS = {
 
 export const tokenStorage = {
   get access() {
-    return localStorage.getItem(STORAGE_KEYS.access);
+    return localStorage.getItem(
+      STORAGE_KEYS.access
+    );
   },
 
   get refresh() {
-    return localStorage.getItem(STORAGE_KEYS.refresh);
+    return localStorage.getItem(
+      STORAGE_KEYS.refresh
+    );
   },
 
   get user() {
@@ -36,10 +29,12 @@ export const tokenStorage = {
         STORAGE_KEYS.user
       );
 
-      return rawUser ? JSON.parse(rawUser) : null;
+      return rawUser
+        ? JSON.parse(rawUser)
+        : null;
     } catch (error) {
       console.warn(
-        'Failed to parse st_user from localStorage:',
+        'Failed to parse stored user:',
         error
       );
 
@@ -47,10 +42,11 @@ export const tokenStorage = {
     }
   },
 
-  set({ access, refresh, user } = {}) {
-    /*
-     * Save or remove the access token.
-     */
+  set({
+    access,
+    refresh,
+    user,
+  } = {}) {
     if (access !== undefined) {
       if (access) {
         localStorage.setItem(
@@ -58,13 +54,12 @@ export const tokenStorage = {
           access
         );
       } else {
-        localStorage.removeItem(STORAGE_KEYS.access);
+        localStorage.removeItem(
+          STORAGE_KEYS.access
+        );
       }
     }
 
-    /*
-     * Save or remove the refresh token.
-     */
     if (refresh !== undefined) {
       if (refresh) {
         localStorage.setItem(
@@ -72,13 +67,12 @@ export const tokenStorage = {
           refresh
         );
       } else {
-        localStorage.removeItem(STORAGE_KEYS.refresh);
+        localStorage.removeItem(
+          STORAGE_KEYS.refresh
+        );
       }
     }
 
-    /*
-     * Save or remove the user.
-     */
     if (user !== undefined) {
       if (user) {
         localStorage.setItem(
@@ -86,15 +80,25 @@ export const tokenStorage = {
           JSON.stringify(user)
         );
       } else {
-        localStorage.removeItem(STORAGE_KEYS.user);
+        localStorage.removeItem(
+          STORAGE_KEYS.user
+        );
       }
     }
   },
 
   clear() {
-    localStorage.removeItem(STORAGE_KEYS.access);
-    localStorage.removeItem(STORAGE_KEYS.refresh);
-    localStorage.removeItem(STORAGE_KEYS.user);
+    localStorage.removeItem(
+      STORAGE_KEYS.access
+    );
+
+    localStorage.removeItem(
+      STORAGE_KEYS.refresh
+    );
+
+    localStorage.removeItem(
+      STORAGE_KEYS.user
+    );
   },
 };
 
@@ -105,16 +109,17 @@ const api = axios.create({
   },
 });
 
-/**
- * Attach the current access token to every request.
- */
 api.interceptors.request.use(
   (config) => {
-    const token = tokenStorage.access;
+    const accessToken =
+      tokenStorage.access;
 
-    if (token) {
-      config.headers = config.headers || {};
-      config.headers.Authorization = `Bearer ${token}`;
+    if (accessToken) {
+      config.headers =
+        config.headers || {};
+
+      config.headers.Authorization =
+        `Bearer ${accessToken}`;
     }
 
     return config;
@@ -125,66 +130,69 @@ api.interceptors.request.use(
 let isRefreshing = false;
 let pendingQueue = [];
 
-/**
- * Resolve or reject requests waiting for token refresh.
- */
-const resolveQueue = (error, token = null) => {
-  pendingQueue.forEach(({ resolve, reject }) => {
-    if (error) {
-      reject(error);
-    } else {
-      resolve(token);
+const resolveQueue = (
+  error,
+  token = null
+) => {
+  pendingQueue.forEach(
+    ({ resolve, reject }) => {
+      if (error) {
+        reject(error);
+      } else {
+        resolve(token);
+      }
     }
-  });
+  );
 
   pendingQueue = [];
 };
 
-/**
- * Check whether a request should skip token refresh.
- */
-const isAuthenticationRoute = (url = '') => {
+const isAuthenticationRoute = (
+  url = ''
+) => {
   return (
     url.includes('/login') ||
     url.includes('/signup') ||
     url.includes('/register') ||
-    url.includes('/refresh-token')
+    url.includes('/refresh-token') || 
+    url.includes('/refresh')
   );
 };
 
-/**
- * Refresh the access token after a 401.
- */
 api.interceptors.response.use(
   (response) => response,
 
   async (error) => {
-    const originalRequest = error.config;
-    const status = error.response?.status;
+    const originalRequest =
+      error.config;
+
+    const status =
+      error.response?.status;
 
     if (!originalRequest) {
       return Promise.reject(error);
     }
 
-    const shouldSkipRefresh =
+    const skipRefresh =
       status !== 401 ||
-      isAuthenticationRoute(originalRequest.url) ||
+      isAuthenticationRoute(
+        originalRequest.url
+      ) ||
       originalRequest._retry;
 
-    if (shouldSkipRefresh) {
+    if (skipRefresh) {
       return Promise.reject(error);
     }
 
-    /*
-     * If another request is refreshing the token, wait for it.
-     */
     if (isRefreshing) {
-      return new Promise((resolve, reject) => {
-        pendingQueue.push({
-          resolve,
-          reject,
-        });
-      }).then((newAccessToken) => {
+      return new Promise(
+        (resolve, reject) => {
+          pendingQueue.push({
+            resolve,
+            reject,
+          });
+        }
+      ).then((newAccessToken) => {
         originalRequest.headers =
           originalRequest.headers || {};
 
@@ -199,40 +207,49 @@ api.interceptors.response.use(
     isRefreshing = true;
 
     try {
-      const refreshToken = tokenStorage.refresh;
+      const refreshToken =
+        tokenStorage.refresh;
 
       if (!refreshToken) {
-        throw new Error('No refresh token available');
+        throw new Error(
+          'No refresh token available.'
+        );
       }
 
-      /*
-       * Use plain axios here rather than api to prevent the
-       * refresh request from entering the same interceptor.
-       */
-      const refreshResponse = await axios.post(
-        `${API_BASE_URL}/refresh-token`,
-        {
-          refresh_token: refreshToken,
-        }
-      );
+      const refreshResponse =
+        await axios.post(
+  `${API_BASE_URL}/auth/refresh-token`,
+  {
+    refresh_token: refreshToken,
+  }
+);
 
-      const responseData = refreshResponse.data;
-      const tokens = responseData?.tokens;
+      const responseData =
+        refreshResponse.data;
+
+      const tokens = responseData?.tokens || {
+  access_token: responseData?.access_token,
+  refresh_token: responseData?.refresh_token,
+};
 
       if (!tokens?.access_token) {
         throw new Error(
-          'Refresh response did not contain an access token'
+          'Refresh response did not contain an access token.'
         );
       }
 
       tokenStorage.set({
         access: tokens.access_token,
         refresh:
-          tokens.refresh_token || refreshToken,
+          tokens.refresh_token ||
+          refreshToken,
         user: responseData.user,
       });
 
-      resolveQueue(null, tokens.access_token);
+      resolveQueue(
+        null,
+        tokens.access_token
+      );
 
       originalRequest.headers =
         originalRequest.headers || {};
@@ -242,7 +259,10 @@ api.interceptors.response.use(
 
       return api(originalRequest);
     } catch (refreshError) {
-      resolveQueue(refreshError, null);
+      resolveQueue(
+        refreshError,
+        null
+      );
 
       tokenStorage.clear();
 
@@ -250,7 +270,9 @@ api.interceptors.response.use(
         new Event('st-auth-expired')
       );
 
-      return Promise.reject(refreshError);
+      return Promise.reject(
+        refreshError
+      );
     } finally {
       isRefreshing = false;
     }

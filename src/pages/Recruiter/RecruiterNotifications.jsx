@@ -86,7 +86,7 @@ export const RecruiterNotifications = () => {
     if (isSupabaseConfigured() && req.student_id) {
       try {
         const { data: profileData } = await supabase
-          .from('student_profiles')
+          .from('candidate_profiles')
           .select('*')
           .eq('user_id', req.student_id)
           .maybeSingle();
