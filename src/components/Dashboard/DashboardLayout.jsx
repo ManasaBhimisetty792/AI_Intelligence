@@ -8,7 +8,13 @@ import './dashboard.css';
 export const DashboardLayout = ({ children, title = 'Dashboard', rightSidebar = null }) => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const location = useLocation();
+  const handleToggleSidebar = () => {
+    if (window.innerWidth <= 768) {
+      setMobileOpen((prev) => !prev);
+    } else {
+      setSidebarOpen((prev) => !prev);
+    }
+  };
 
   return (
     <div className="dashboard-shell">
@@ -22,7 +28,10 @@ export const DashboardLayout = ({ children, title = 'Dashboard', rightSidebar = 
       <div className="dashboard-main">
         <Topbar
           title={title}
-          onMenuToggle={() => setMobileOpen(!mobileOpen)}
+          sidebarOpen={sidebarOpen}
+          mobileOpen={mobileOpen}
+          onToggleSidebar={handleToggleSidebar}
+          onMenuToggle={() => setMobileOpen((prev) => !prev)}
         />
 
         <main className="dashboard-viewport">

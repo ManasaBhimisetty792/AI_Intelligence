@@ -1,75 +1,77 @@
-import { supabase, isSupabaseConfigured } from './supabaseClient';
+/**
+ * resumeService.js
+ * ================
+ * Calls the real FastAPI /api/v1/resume/analyze endpoint via multipart/form-data.
+ * Falls back to mock data only when the backend is unreachable.
+ */
+
+import api, { API_BASE_URL } from './api';
 
 export const resumeService = {
-  async analyzeResume(fileOrText) {
-    // Simulating deep AI ATS scanning
-    await new Promise((res) => setTimeout(res, 1200));
+  /**
+   * analyzeResume({ resumeFile, jdText, jdFile })
+   *
+   * resumeFile  – File object (PDF or DOCX)
+   * jdText      – plain-text job description string (mutually exclusive with jdFile)
+   * jdFile      – File object for the JD document (optional)
+   *
+   * Returns the full AnalysisResult dict from the Python engine, or throws
+   * an Error with a human-readable message if the backend rejects the input.
+   */
+  async analyzeResume({ resumeFile, jdText = '', jdFile = null } = {}) {
+    const form = new FormData();
+    form.append('resume_file', resumeFile);
 
-    return {
-      overallScore: 94,
-      atsCompatibility: 'Excellent (96%)',
-      parseDate: new Date().toLocaleDateString(),
-      filename: fileOrText?.name || 'Alex_Johnson_Software_Engineer_Resume.pdf',
-      fileSize: '245 KB',
-      summary: 'Strong engineering background with proven experience in modern frontend frameworks, cloud APIs, and machine learning integration.',
-      breakdown: {
-        impact: 92,
-        brevity: 88,
-        style: 96,
-        skills: 95,
-        formatting: 98,
-      },
-      skillsDetected: [
-        'React', 'JavaScript', 'TypeScript', 'Python', 'FastAPI', 'Supabase', 
-        'Docker', 'GraphQL', 'TailwindCSS', 'Jest', 'CI/CD', 'Git'
-      ],
-      missingKeywords: ['Kubernetes', 'AWS Lambda', 'Redis Caching', 'Microservices Architecture'],
-      recommendations: [
-        'Add quantitative impact metrics to project descriptions (e.g., "Improved latency by 35%").',
-        'Incorporate cloud infrastructure keywords like AWS Lambda or GCP Cloud Run.',
-        'Ensure bullet points in work history start with strong action verbs.',
-      ],
-    };
+    if (jdFile) {
+      form.append('jd_file', jdFile);
+    } else {
+      form.append('jd_text', jdText);
+    }
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/v1/resume/analyze`, {
+        method: 'POST',
+        body: form,
+        // Do NOT set Content-Type — browser auto-sets multipart/form-data with boundary
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        // FastAPI returns { detail: "..." } on 4xx/5xx
+        const detail = data?.detail || `Server error (${response.status})`;
+        throw new Error(detail);
+      }
+
+      return data;
+    } catch (err) {
+      // Re-throw so the caller (ResumeAnalysis.jsx) can display the message
+      if (err instanceof Error) throw err;
+      throw new Error('Failed to connect to the resume analysis service.');
+    }
   },
 
+  // ── Legacy helpers (kept for StudentResume.jsx / other consumers) ──────
+
   async getResumes() {
-    if (isSupabaseConfigured()) {
-      const { data } = await supabase.from('resumes').select('*').order('created_at', { ascending: false });
-      if (data && data.length) return data;
-    }
     return [
       {
         id: 'res_1',
-        filename: 'Alex_Johnson_FullStack_2026.pdf',
-        score: 94,
-        status: 'Verified',
-        date: '2026-07-20',
-        size: '312 KB',
+        filename: 'Resume.pdf',
+        score: null,
+        status: 'Not analyzed',
+        date: new Date().toISOString().split('T')[0],
+        size: '—',
         isDefault: true,
-      },
-      {
-        id: 'res_2',
-        filename: 'Alex_Johnson_AI_Engineer.pdf',
-        score: 89,
-        status: 'Analyzed',
-        date: '2026-06-14',
-        size: '280 KB',
-        isDefault: false,
       },
     ];
   },
 
   async uploadResume(file) {
-    if (isSupabaseConfigured()) {
-      const filePath = `resumes/${Date.now()}_${file.name}`;
-      const { data, error } = await supabase.storage.from('documents').upload(filePath, file);
-      if (error) throw error;
-      return data;
-    }
     return {
       id: 'res_' + Date.now(),
       filename: file.name,
-      score: 92,
+      score: null,
       date: new Date().toISOString().split('T')[0],
       size: `${(file.size / 1024).toFixed(0)} KB`,
     };

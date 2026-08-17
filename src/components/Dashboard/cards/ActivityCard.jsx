@@ -13,7 +13,7 @@ export const ActivityCard = ({ title, timestamp, description, status, icon }) =>
             color: 'var(--color-primary)',
             display: 'flex',
             alignItems: 'center',
-            justify: 'center',
+            justifyContent: 'center',
             fontSize: '0.95rem',
             flexShrink: 0,
             marginTop: '2px',

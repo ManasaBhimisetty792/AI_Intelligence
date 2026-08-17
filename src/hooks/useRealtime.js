@@ -1,15 +1,23 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { supabase } from "../services/supabaseClient";
 
 const useRealtime = (
   tables = [],
   callback
 ) => {
+  const callbackRef = useRef(callback);
+
+  useEffect(() => {
+    callbackRef.current = callback;
+  }, [callback]);
+
+  const tablesKey = Array.isArray(tables) ? tables.slice().sort().join("|") : "";
+
   useEffect(() => {
     if (
       !Array.isArray(tables) ||
       tables.length === 0 ||
-      typeof callback !== "function"
+      typeof callbackRef.current !== "function"
     ) {
       return undefined;
     }
@@ -29,7 +37,9 @@ const useRealtime = (
             table,
           },
           () => {
-            callback();
+            if (typeof callbackRef.current === "function") {
+              callbackRef.current();
+            }
           }
         )
         .subscribe();
@@ -42,7 +52,7 @@ const useRealtime = (
         supabase.removeChannel(channel);
       });
     };
-  }, [callback, tables.join("|")]);
+  }, [tablesKey]);
 };
 
 export default useRealtime;

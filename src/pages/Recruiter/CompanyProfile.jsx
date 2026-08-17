@@ -10,12 +10,12 @@ import {
   FiAward,
   FiMapPin,
   FiMail,
+  FiRefreshCw,
 } from 'react-icons/fi';
 import DashboardLayout from '../../components/Dashboard/DashboardLayout';
 import recruiterService from '../../services/recruiterService';
 import { supabase } from '../../services/supabaseClient';
 import './CompanyProfile.css';
-
 
 const CompanyProfile = () => {
   const [activeTab, setActiveTab] = useState('personal');
@@ -23,7 +23,6 @@ const CompanyProfile = () => {
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState(null);
   const [errors, setErrors] = useState({});
-
 
   const [formData, setFormData] = useState({
     full_name: '',
@@ -44,22 +43,17 @@ const CompanyProfile = () => {
     tax_id: '',
   });
 
-
   const [availabilityText, setAvailabilityText] = useState('');
-
 
   const showToast = (type, message) => {
     setToast({ type, message });
     setTimeout(() => setToast(null), 4000);
   };
 
-
   const loadProfile = async () => {
     setLoading(true);
     try {
       const data = await recruiterService.getProfile();
-
-
       if (data) {
         setFormData({
           full_name: data.full_name || '',
@@ -79,8 +73,6 @@ const CompanyProfile = () => {
           verification_status: data.verification_status || 'Verified',
           tax_id: data.tax_id || '',
         });
-
-
         setAvailabilityText(String(data.availability || ''));
       }
     } catch (err) {
@@ -91,28 +83,21 @@ const CompanyProfile = () => {
     }
   };
 
-
   useEffect(() => {
     loadProfile();
   }, []);
 
-
   const validate = () => {
     const errs = {};
-
-
     if (!formData.full_name.trim()) errs.full_name = 'Full name is required';
     if (!formData.email.trim() || !formData.email.includes('@')) {
       errs.email = 'Valid email is required';
     }
     if (!formData.company_name.trim()) errs.company_name = 'Company name is required';
     if (!formData.phone.trim()) errs.phone = 'Phone number is required';
-
-
     setErrors(errs);
     return Object.keys(errs).length === 0;
   };
-
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -120,8 +105,6 @@ const CompanyProfile = () => {
       ...previous,
       [name]: name === 'experience_years' ? Number(value) : value,
     }));
-
-
     if (errors[name]) {
       setErrors((previous) => ({
         ...previous,
@@ -130,45 +113,30 @@ const CompanyProfile = () => {
     }
   };
 
-
   const handleImageUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
-
     const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
-
-
     if (!allowedTypes.includes(file.type)) {
       showToast('error', 'Please upload a JPG, PNG, or WEBP image.');
       e.target.value = '';
       return;
     }
-
-
     if (file.size > 5 * 1024 * 1024) {
       showToast('error', 'Image must be smaller than 5 MB.');
       e.target.value = '';
       return;
     }
-
-
     try {
       const { data: authData, error: authError } = await supabase.auth.getUser();
       if (authError) throw authError;
-
-
       const user = authData?.user;
       if (!user) {
         showToast('error', 'Please login again.');
         return;
       }
-
-
       const fileExt = file.name.split('.').pop()?.toLowerCase() || 'jpg';
       const filePath = `${user.id}/avatar-${Date.now()}.${fileExt}`;
-
-
       const { error: uploadError } = await supabase.storage
         .from('profile_images')
         .upload(filePath, file, {
@@ -176,26 +144,16 @@ const CompanyProfile = () => {
           cacheControl: '3600',
           contentType: file.type,
         });
-
-
       if (uploadError) throw uploadError;
-
-
       const { data: publicUrlData } = supabase.storage
         .from('profile_images')
         .getPublicUrl(filePath);
-
-
       const avatarUrl = publicUrlData?.publicUrl || '';
       if (!avatarUrl) throw new Error('Could not generate public URL for uploaded image.');
-
-
       setFormData((previous) => ({
         ...previous,
         avatar_url: avatarUrl,
       }));
-
-
       showToast('success', 'Photo uploaded. Click Save Profile to store changes.');
     } catch (err) {
       console.error(err);
@@ -205,27 +163,18 @@ const CompanyProfile = () => {
     }
   };
 
-
   const handleSave = async (e) => {
     e?.preventDefault();
-
-
     if (!validate()) {
       showToast('error', 'Please correct validation errors before saving.');
       return;
     }
-
-
     setSaving(true);
-
-
     try {
       await recruiterService.updateProfile({
         ...formData,
         availability: availabilityText,
       });
-
-
       showToast('success', 'Profile and availability updated successfully.');
       await loadProfile();
     } catch (err) {
@@ -236,13 +185,11 @@ const CompanyProfile = () => {
     }
   };
 
-
   const handleReset = async () => {
     await loadProfile();
     setErrors({});
     showToast('success', 'Changes reset.');
   };
-
 
   return (
     <DashboardLayout title="Recruiter Profile">
@@ -259,19 +206,17 @@ const CompanyProfile = () => {
         </div>
       )}
 
-
       <div className="glass-card profile-header-card">
         <div className="profile-header-content">
           <div className="profile-avatar-wrapper">
             <img
-              src={formData.avatar_url || 'https://i.pravatar.cc/120?img=68'}
+              src={formData.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=400'}
               alt={formData.full_name || 'Recruiter'}
               onError={(e) => {
-                e.currentTarget.src = 'https://i.pravatar.cc/120?img=68';
+                e.currentTarget.src = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=400';
               }}
               className="profile-avatar"
             />
-
 
             <button
               type="button"
@@ -282,7 +227,6 @@ const CompanyProfile = () => {
               <FiCamera size={14} />
             </button>
 
-
             <input
               id="avatarUpload"
               type="file"
@@ -292,13 +236,11 @@ const CompanyProfile = () => {
             />
           </div>
 
-
           <div className="profile-summary">
             <div className="profile-name-row">
               <h2 className="profile-name">
                 {formData.full_name || 'Recruiter'}
               </h2>
-
 
               <span className="profile-verification-badge">
                 <FiCheckCircle />
@@ -306,38 +248,35 @@ const CompanyProfile = () => {
               </span>
             </div>
 
-
             <p className="profile-designation">
-              {formData.designation || 'Recruiter'} at{' '}
-              <strong>{formData.company_name || 'Company'}</strong>
+              {formData.designation || 'Senior Talent Acquisition'} at{' '}
+              <strong>{formData.company_name || 'TechCorp'}</strong>
             </p>
-
 
             <div className="profile-meta">
               <span>
                 <FiMapPin style={{ marginRight: '4px' }} />
-                {formData.location || 'Unknown location'}
+                {formData.location || 'Location not set'}
               </span>
               <span>
                 <FiAward style={{ marginRight: '4px' }} />
-                {formData.experience_years} Years Experience
+                {formData.experience_years} Years Exp.
               </span>
               <span>
                 <FiMail style={{ marginRight: '4px' }} />
-                {formData.email}
+                {formData.email || 'Email not set'}
               </span>
             </div>
           </div>
         </div>
       </div>
 
-
       <div className="profile-tabs">
         {[
           { key: 'personal', label: 'Personal Details', icon: FiUser },
           { key: 'company', label: 'Company Details', icon: FiBriefcase },
           { key: 'professional', label: 'Professional Details', icon: FiAward },
-          { key: 'verification', label: 'Verification & Tax', icon: FiShield },
+          { key: 'verification', label: 'Verification & Availability', icon: FiShield },
         ].map((tab) => {
           const Icon = tab.icon;
           return (
@@ -354,7 +293,6 @@ const CompanyProfile = () => {
         })}
       </div>
 
-
       <form onSubmit={handleSave} className="glass-card profile-form-card">
         {activeTab === 'personal' && (
           <div className="grid-responsive grid-col-2 profile-fields-grid">
@@ -365,11 +303,11 @@ const CompanyProfile = () => {
                 name="full_name"
                 value={formData.full_name}
                 onChange={handleChange}
+                placeholder="e.g. Sarah Jenkins"
                 className={`input-field ${errors.full_name ? 'input-error' : ''}`}
               />
               {errors.full_name && <span className="field-error">{errors.full_name}</span>}
             </div>
-
 
             <div className="profile-field">
               <label>Email Address *</label>
@@ -378,11 +316,11 @@ const CompanyProfile = () => {
                 name="email"
                 value={formData.email}
                 onChange={handleChange}
+                placeholder="sarah@company.com"
                 className={`input-field ${errors.email ? 'input-error' : ''}`}
               />
               {errors.email && <span className="field-error">{errors.email}</span>}
             </div>
-
 
             <div className="profile-field">
               <label>Phone Number *</label>
@@ -391,11 +329,11 @@ const CompanyProfile = () => {
                 name="phone"
                 value={formData.phone}
                 onChange={handleChange}
+                placeholder="+1 (555) 019-2834"
                 className={`input-field ${errors.phone ? 'input-error' : ''}`}
               />
               {errors.phone && <span className="field-error">{errors.phone}</span>}
             </div>
-
 
             <div className="profile-field">
               <label>Current Designation</label>
@@ -404,12 +342,12 @@ const CompanyProfile = () => {
                 name="designation"
                 value={formData.designation}
                 onChange={handleChange}
+                placeholder="Lead Technical Recruiter"
                 className="input-field"
               />
             </div>
           </div>
         )}
-
 
         {activeTab === 'company' && (
           <div className="grid-responsive grid-col-2 profile-fields-grid">
@@ -420,11 +358,11 @@ const CompanyProfile = () => {
                 name="company_name"
                 value={formData.company_name}
                 onChange={handleChange}
+                placeholder="Acme Innovations Inc."
                 className={`input-field ${errors.company_name ? 'input-error' : ''}`}
               />
               {errors.company_name && <span className="field-error">{errors.company_name}</span>}
             </div>
-
 
             <div className="profile-field">
               <label>Company Website</label>
@@ -433,10 +371,10 @@ const CompanyProfile = () => {
                 name="company_website"
                 value={formData.company_website}
                 onChange={handleChange}
+                placeholder="https://acme.example.com"
                 className="input-field"
               />
             </div>
-
 
             <div className="profile-field">
               <label>Industry Domain</label>
@@ -445,10 +383,10 @@ const CompanyProfile = () => {
                 name="industry"
                 value={formData.industry}
                 onChange={handleChange}
+                placeholder="Artificial Intelligence / SaaS"
                 className="input-field"
               />
             </div>
-
 
             <div className="profile-field">
               <label>Company Size</label>
@@ -467,7 +405,6 @@ const CompanyProfile = () => {
               </select>
             </div>
 
-
             <div className="profile-field full-width-field">
               <label>Headquarters / Location</label>
               <input
@@ -475,12 +412,12 @@ const CompanyProfile = () => {
                 name="location"
                 value={formData.location}
                 onChange={handleChange}
+                placeholder="San Francisco, CA / Remote"
                 className="input-field"
               />
             </div>
           </div>
         )}
-
 
         {activeTab === 'professional' && (
           <div className="profile-column">
@@ -497,7 +434,6 @@ const CompanyProfile = () => {
                 />
               </div>
 
-
               <div className="profile-field">
                 <label>Hiring Specialization</label>
                 <input
@@ -505,31 +441,31 @@ const CompanyProfile = () => {
                   name="specialization"
                   value={formData.specialization}
                   onChange={handleChange}
+                  placeholder="Full-Stack Developers, ML Engineers"
                   className="input-field"
                 />
               </div>
             </div>
 
-
             <div className="profile-field">
-              <label>Recruiter Bio & Overview</label>
+              <label>Recruiter Bio &amp; Overview</label>
               <textarea
                 name="bio"
                 rows={4}
                 value={formData.bio}
                 onChange={handleChange}
+                placeholder="Tell candidates about your recruiting focus and company culture..."
                 className="input-field"
               />
             </div>
           </div>
         )}
 
-
         {activeTab === 'verification' && (
           <div className="profile-column">
             <div className="grid-responsive grid-col-2 profile-fields-grid">
               <div className="profile-field">
-                <label>Verification Badge Status</label>
+                <label>Verification Status</label>
                 <input
                   type="text"
                   disabled
@@ -538,7 +474,6 @@ const CompanyProfile = () => {
                 />
               </div>
 
-
               <div className="profile-field">
                 <label>Corporate Tax ID / Registration</label>
                 <input
@@ -546,11 +481,11 @@ const CompanyProfile = () => {
                   name="tax_id"
                   value={formData.tax_id}
                   onChange={handleChange}
+                  placeholder="TAX-987654321"
                   className="input-field"
                 />
               </div>
             </div>
-
 
             <div className="availability-section">
               <div className="availability-heading">
@@ -563,7 +498,6 @@ const CompanyProfile = () => {
                 </div>
               </div>
 
-
               {errors.availability && (
                 <div className="availability-error">
                   <FiAlertCircle />
@@ -571,13 +505,12 @@ const CompanyProfile = () => {
                 </div>
               )}
 
-
               <div className="profile-field">
                 <label>Availability</label>
                 <textarea
                   value={availabilityText}
                   onChange={(e) => setAvailabilityText(e.target.value)}
-                  rows={6}
+                  rows={5}
                   className="input-field"
                   placeholder={`Monday: 09:00 - 18:00
 Tuesday: 09:00 - 18:00
@@ -585,26 +518,24 @@ Wednesday: 09:00 - 18:00`}
                 />
               </div>
             </div>
-
-
-            {/* Save button only appears on verification tab */}
-            <div className="profile-actions">
-              <button type="button" onClick={handleReset} className="btn btn-outline">
-                Reset Changes
-              </button>
-
-
-              <button type="submit" disabled={saving || loading} className="btn btn-primary">
-                <FiSave />
-                {saving ? 'Saving...' : 'Save Profile'}
-              </button>
-            </div>
           </div>
         )}
+
+        {/* Global Save and Reset Actions for all tabs */}
+        <div className="profile-actions">
+          <button type="button" onClick={handleReset} className="btn btn-outline" disabled={saving || loading}>
+            <FiRefreshCw />
+            Reset Changes
+          </button>
+
+          <button type="submit" disabled={saving || loading} className="btn btn-primary">
+            <FiSave />
+            {saving ? 'Saving Profile...' : 'Save Profile'}
+          </button>
+        </div>
       </form>
     </DashboardLayout>
   );
 };
-
 
 export default CompanyProfile;

@@ -1,134 +1,121 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
+  LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, AreaChart, Area,
   XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContainer, Legend,
 } from 'recharts';
 import {
-  FiShield, FiUsers, FiCheckCircle, FiCreditCard, FiAlertCircle,
-  FiActivity, FiTrendingUp, FiServer, FiBell, FiUserCheck,
-  FiFileText, FiRefreshCw, FiLoader, FiAward, FiZap,
+  FiUsers, FiCheckCircle, FiAlertCircle, FiActivity, FiDollarSign,
+  FiUserCheck, FiShield, FiBell, FiSliders, FiFileText, FiRefreshCw, FiZap,
 } from 'react-icons/fi';
-import { HiSparkles } from 'react-icons/hi';
-import DashboardLayout from '../../components/Dashboard/DashboardLayout';
-import { useAuth } from '../../hooks/useAuth';
-import useRealtime from '../../hooks/useRealtime';
-import adminService from '../../services/adminService';
 import toast from 'react-hot-toast';
 
-// ─── Stat Card ────────────────────────────────────────────────────────────────
-const KpiCard = ({ icon, label, value, sub, accent, loading }) => (
-  <div style={{
-    background: 'rgba(255,255,255,0.04)',
-    border: `1px solid ${accent}33`,
-    borderRadius: 16,
-    padding: '1.25rem 1.5rem',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '0.6rem',
-    position: 'relative',
-    overflow: 'hidden',
-    transition: 'transform 0.2s, box-shadow 0.2s',
-  }}
-    onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = `0 8px 32px ${accent}22`; }}
-    onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}
-  >
-    <div style={{ position: 'absolute', top: 0, right: 0, width: 120, height: 120, background: `radial-gradient(circle, ${accent}22 0%, transparent 70%)`, pointerEvents: 'none' }} />
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-      <div style={{ width: 40, height: 40, borderRadius: 10, background: `${accent}20`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: accent, fontSize: '1.1rem' }}>
-        {icon}
-      </div>
-    </div>
-    {loading ? (
-      <div style={{ height: 32, background: 'rgba(255,255,255,0.06)', borderRadius: 8, animation: 'pulse 1.5s infinite' }} />
-    ) : (
-      <div style={{ fontSize: '1.9rem', fontWeight: 900, color: 'var(--color-text)', lineHeight: 1 }}>{value}</div>
-    )}
-    <div style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{label}</div>
-    {sub && <div style={{ fontSize: '0.75rem', color: accent, fontWeight: 600 }}>{sub}</div>}
-  </div>
-);
+import AdminLayout from '../../components/Admin/AdminLayout';
+import AdminStatCard from '../../components/Admin/AdminStatCard';
+import { useAuth } from '../../context/AuthContext';
+import useRealtime from '../../hooks/useRealtime';
+import adminService from '../../services/adminService';
 
-// ─── Chart Card wrapper ───────────────────────────────────────────────────────
-const ChartWrapper = ({ title, subtitle, children, action }) => (
-  <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 16, padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
-      <div>
-        <div style={{ fontWeight: 800, fontSize: '0.95rem', color: 'var(--color-text)' }}>{title}</div>
-        {subtitle && <div style={{ fontSize: '0.78rem', color: 'var(--color-muted)', marginTop: 2 }}>{subtitle}</div>}
-      </div>
-      {action}
-    </div>
-    {children}
-  </div>
-);
+const CustomTooltipStyle = {
+  background: 'var(--color-surface)',
+  border: '1px solid var(--color-border)',
+  borderRadius: 'var(--radius-md)',
+  fontSize: '0.8rem',
+  color: 'var(--color-text)',
+  boxShadow: 'var(--shadow-md)',
+};
 
-const CustomTooltipStyle = { background: 'rgba(15,15,25,0.95)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, fontSize: '0.8rem', color: '#fff' };
-
-// ─── Admin Dashboard ──────────────────────────────────────────────────────────
 export const AdminDashboard = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+
   const [stats, setStats] = useState(null);
+  const [subStats, setSubStats] = useState(null);
   const [growthData, setGrowthData] = useState([]);
-  const [pieData, setPieData] = useState([]);
+  const [roleData, setRoleData] = useState([]);
   const [trendData, setTrendData] = useState([]);
+  const [revenueData, setRevenueData] = useState([]);
   const [activity, setActivity] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const loadAll = useCallback(async () => {
+  const loadDashboardData = useCallback(async () => {
     setLoading(true);
     try {
-      const [s, g, p, t, a] = await Promise.all([
+      const [s, sub, g, r, t, rev, a] = await Promise.all([
         adminService.fetchDashboardStats(),
+        adminService.fetchSubscriptionStats(),
         adminService.fetchUserGrowthChart(),
         adminService.fetchRoleDistribution(),
         adminService.fetchInterviewTrend(),
+        adminService.fetchRevenueTrendChart(),
         adminService.fetchRecentActivity(12),
       ]);
       setStats(s);
+      setSubStats(sub);
       setGrowthData(g);
-      setPieData(p);
+      setRoleData(r);
       setTrendData(t);
+      setRevenueData(rev);
       setActivity(a);
     } catch (err) {
-      toast.error('Failed to load admin data.');
+      toast.error('Failed to load admin telemetry data.');
     } finally {
       setLoading(false);
     }
   }, []);
 
-  useEffect(() => { loadAll(); }, [loadAll]);
-  useRealtime(['profiles', 'interview_requests', 'notifications'], loadAll);
+  useEffect(() => {
+    loadDashboardData();
+  }, [loadDashboardData]);
 
-  const currentDate = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+  useRealtime(['profiles', 'interview_requests', 'notifications', 'student_payments'], loadDashboardData);
 
   const kpis = [
-    { icon: <FiUsers />, label: 'Total Students', value: stats?.totalStudents ?? '—', sub: 'Registered learners', accent: '#4F46E5' },
-    { icon: <FiCheckCircle />, label: 'Total Recruiters', value: stats?.totalRecruiters ?? '—', sub: `${stats?.pendingVerifications ?? 0} pending approval`, accent: '#10B981' },
-    { icon: <FiAlertCircle />, label: 'Pending Verifications', value: stats?.pendingVerifications ?? '—', sub: 'Recruiter queue', accent: '#F59E0B' },
-    { icon: <FiActivity />, label: 'Interviews Scheduled', value: stats?.totalInterviews ?? '—', sub: 'All time requests', accent: '#06B6D4' },
-    { icon: <FiBell />, label: 'Unread Notifications', value: stats?.unreadNotifications ?? '—', sub: 'Platform-wide', accent: '#EF4444' },
+    {
+      icon: <FiUsers />,
+      label: 'Total Students',
+      value: stats?.totalStudents ?? '—',
+      sub: `${subStats?.freeUsers ?? 0} Free · ${subStats?.premiumSubscribers ?? 0} Premium`,
+      accent: 'var(--color-primary)',
+    },
+    {
+      icon: <FiCheckCircle />,
+      label: 'Total Recruiters',
+      value: stats?.totalRecruiters ?? '—',
+      sub: `${stats?.pendingVerifications ?? 0} pending verification`,
+      accent: 'var(--color-secondary)',
+    },
+    {
+      icon: <FiActivity />,
+      label: 'Interviews Scheduled',
+      value: stats?.totalInterviews ?? '—',
+      sub: 'Total technical drills',
+      accent: 'var(--color-accent)',
+    },
+    {
+      icon: <FiDollarSign />,
+      label: 'Total Platform Revenue',
+      value: subStats ? `₹${(subStats.totalRevenue || 0).toLocaleString()}` : '—',
+      sub: `₹${(subStats?.monthlyRevenue || 0).toLocaleString()} this month`,
+      accent: 'var(--color-success)',
+    },
+    // {
+    //   icon: <FiAlertCircle />,
+    //   label: 'Pending Queue',
+    //   value: stats?.pendingVerifications ?? '—',
+    //   sub: 'Action required',
+    //   accent: 'var(--color-warning)',
+    // },
   ];
 
   const quickActions = [
-    { label: 'Verify Recruiters', icon: <FiUserCheck />, accent: '#7C3AED', path: '/admin/recruiter-verification' },
-    { label: 'Manage Users', icon: <FiUsers />, accent: '#4F46E5', path: '/admin/user-management' },
-    { label: 'Audit Logs', icon: <FiShield />, accent: '#10B981', path: '/admin/audit-logs' },
-    { label: 'Notifications', icon: <FiBell />, accent: '#F59E0B', path: '/admin/notifications' },
-    { label: 'Settings', icon: <FiServer />, accent: '#06B6D4', path: '/admin/platform-settings' },
+    { label: 'Recruiter Queue', icon: <FiUserCheck />, accent: 'var(--color-warning)', path: '/admin/recruiter-verification' },
+    { label: 'User Directory', icon: <FiUsers />, accent: 'var(--color-primary)', path: '/admin/users' },
+    { label: 'Subscriptions', icon: <FiDollarSign />, accent: 'var(--color-success)', path: '/admin/subscriptions' },
+    { label: 'Security Audit', icon: <FiShield />, accent: 'var(--color-secondary)', path: '/admin/audit-logs' },
+    { label: 'Notifications', icon: <FiBell />, accent: 'var(--color-accent)', path: '/admin/notifications' },
+    { label: 'Settings', icon: <FiSliders />, accent: 'var(--color-muted)', path: '/admin/settings' },
   ];
-
-  const typeColors = {
-    interview_request: '#4F46E5', interview_accepted: '#10B981',
-    interview_rejected: '#EF4444', feedback_submitted: '#F59E0B',
-    admin: '#7C3AED', system: '#64748B',
-  };
-  const getColor = (t) => {
-    const type = (t || '').toLowerCase();
-    for (const [k, v] of Object.entries(typeColors)) { if (type.includes(k)) return v; }
-    return '#64748B';
-  };
 
   const formatTime = (ts) => {
     if (!ts) return '';
@@ -141,202 +128,333 @@ export const AdminDashboard = () => {
   };
 
   return (
-    <DashboardLayout title="Admin Dashboard">
-      {/* ── Welcome Banner ── */}
-      <div style={{
-        background: 'linear-gradient(135deg, rgba(79,70,229,0.15) 0%, rgba(124,58,237,0.1) 50%, rgba(6,182,212,0.08) 100%)',
-        border: '1px solid rgba(79,70,229,0.25)',
-        borderRadius: 20,
-        padding: '2rem 2.5rem',
-        marginBottom: '1.75rem',
-        position: 'relative',
-        overflow: 'hidden',
-      }}>
-        <div style={{ position: 'absolute', top: -40, right: -40, width: 200, height: 200, background: 'radial-gradient(circle, rgba(124,58,237,0.2) 0%, transparent 70%)', pointerEvents: 'none' }} />
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
-              <span style={{ background: 'rgba(124,58,237,0.2)', color: '#7C3AED', padding: '0.25rem 0.75rem', borderRadius: 999, fontSize: '0.75rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                <FiShield /> ADMIN PORTAL
-              </span>
-              <span style={{ fontSize: '0.75rem', color: 'var(--color-muted)' }}>{currentDate}</span>
-            </div>
-            <h2 style={{ fontSize: '1.7rem', fontWeight: 900, margin: '0 0 0.3rem', color: 'var(--color-text)' }}>
-              Welcome back, {user?.name || 'Administrator'} 👋
-            </h2>
-            <p style={{ color: 'var(--color-muted)', margin: 0, fontSize: '0.88rem' }}>
-              Platform overview — all metrics pulling live from Supabase.
-            </p>
-          </div>
-          <button
-            onClick={loadAll}
-            disabled={loading}
-            style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.6rem 1.2rem', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, color: 'var(--color-text)', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 600 }}
-          >
-            <FiRefreshCw style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} /> Refresh
-          </button>
-        </div>
+    <AdminLayout
+      title={`Welcome back, ${user?.name || 'Administrator'} `}
+      subtitle="Real-time SaaS administrative console pulling verified metrics from Supabase."
+      onRefresh={loadDashboardData}
+      refreshing={loading}
+    >
+      {/* KPI Cards Grid */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.25rem' }}>
+        {kpis.map((k) => (
+          <AdminStatCard key={k.label} {...k} loading={loading} />
+        ))}
       </div>
 
-      {/* ── KPI Grid ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem', marginBottom: '1.75rem' }}>
-        {kpis.map((k) => <KpiCard key={k.label} {...k} loading={loading} />)}
-      </div>
-
-      {/* ── Quick Actions ── */}
-      <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginBottom: '1.75rem' }}>
+      {/* Quick Action Navigation Buttons */}
+      <div
+        style={{
+          display: 'flex',
+          gap: '0.75rem',
+          flexWrap: 'wrap',
+          background: 'var(--glass-bg)',
+          border: '1px solid var(--color-border)',
+          borderRadius: 'var(--radius-xl)',
+          padding: '1rem 1.25rem',
+          boxShadow: 'var(--shadow-sm)',
+        }}
+      >
+        <span
+          style={{
+            fontSize: '0.78rem',
+            fontWeight: 800,
+            color: 'var(--color-muted)',
+            display: 'flex',
+            alignItems: 'center',
+            marginRight: '0.5rem',
+            textTransform: 'uppercase',
+            letterSpacing: '0.04em',
+          }}
+        >
+          Quick Shortcuts:
+        </span>
         {quickActions.map((q) => (
           <button
             key={q.label}
             onClick={() => navigate(q.path)}
             style={{
-              display: 'flex', alignItems: 'center', gap: '0.5rem',
-              padding: '0.6rem 1.25rem', borderRadius: 10,
-              background: `${q.accent}15`, border: `1px solid ${q.accent}40`,
-              color: q.accent, fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer',
-              transition: 'all 0.2s',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.45rem',
+              padding: '0.55rem 1.1rem',
+              borderRadius: 'var(--radius-md)',
+              background: `${q.accent}12`,
+              border: `1px solid ${q.accent}33`,
+              color: 'var(--color-text)',
+              fontWeight: 700,
+              fontSize: '0.82rem',
+              cursor: 'pointer',
+              transition: 'all var(--transition-fast)',
             }}
-            onMouseEnter={e => { e.currentTarget.style.background = `${q.accent}25`; e.currentTarget.style.transform = 'translateY(-1px)'; }}
-            onMouseLeave={e => { e.currentTarget.style.background = `${q.accent}15`; e.currentTarget.style.transform = 'none'; }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = `${q.accent}25`;
+              e.currentTarget.style.transform = 'translateY(-1px)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = `${q.accent}12`;
+              e.currentTarget.style.transform = 'none';
+            }}
           >
-            {q.icon} {q.label}
+            <span style={{ color: q.accent }}>{q.icon}</span> {q.label}
           </button>
         ))}
       </div>
 
-      {/* ── Charts Row ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.5rem', marginBottom: '1.75rem' }}>
-
+      {/* Charts Section Grid */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.5rem' }}>
         {/* User Growth Line Chart */}
-        <ChartWrapper title="User Growth" subtitle="Monthly student & recruiter registrations">
+        <div
+          style={{
+            background: 'var(--glass-bg)',
+            border: '1px solid var(--color-border)',
+            borderRadius: 'var(--radius-xl)',
+            padding: '1.5rem',
+            boxShadow: 'var(--shadow-sm)',
+          }}
+        >
+          <div style={{ fontWeight: 800, fontSize: '0.95rem', color: 'var(--color-text)', marginBottom: '0.2rem' }}>
+            User Growth Trend
+          </div>
+          <div style={{ fontSize: '0.78rem', color: 'var(--color-muted)', marginBottom: '1.25rem' }}>
+            Monthly student and recruiter account registrations
+          </div>
           {growthData.length === 0 ? (
             <div style={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-muted)', fontSize: '0.85rem' }}>
-              {loading ? <FiLoader style={{ animation: 'spin 1s linear infinite', fontSize: '1.5rem', color: '#4F46E5' }} /> : 'No growth data yet'}
+              No registration history available yet
             </div>
           ) : (
-            <ResponsiveContainer width="100%" height={200}>
+            <ResponsiveContainer width="100%" height={210}>
               <LineChart data={growthData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-                <XAxis dataKey="month" tick={{ fill: '#94A3B8', fontSize: 11 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fill: '#94A3B8', fontSize: 11 }} axisLine={false} tickLine={false} allowDecimals={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
+                <XAxis dataKey="month" tick={{ fill: 'var(--color-muted)', fontSize: 11 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fill: 'var(--color-muted)', fontSize: 11 }} axisLine={false} tickLine={false} allowDecimals={false} />
                 <Tooltip contentStyle={CustomTooltipStyle} />
                 <Legend iconType="circle" wrapperStyle={{ fontSize: 11, paddingTop: 8 }} />
-                <Line type="monotone" dataKey="Students" stroke="#4F46E5" strokeWidth={2.5} dot={{ r: 3, fill: '#4F46E5' }} activeDot={{ r: 5 }} />
-                <Line type="monotone" dataKey="Recruiters" stroke="#10B981" strokeWidth={2.5} dot={{ r: 3, fill: '#10B981' }} activeDot={{ r: 5 }} />
+                <Line type="monotone" dataKey="Students" stroke="var(--color-primary)" strokeWidth={2.5} dot={{ r: 3, fill: 'var(--color-primary)' }} />
+                <Line type="monotone" dataKey="Recruiters" stroke="var(--color-secondary)" strokeWidth={2.5} dot={{ r: 3, fill: 'var(--color-secondary)' }} />
               </LineChart>
             </ResponsiveContainer>
           )}
-        </ChartWrapper>
+        </div>
 
-        {/* Role Distribution Donut */}
-        <ChartWrapper title="Role Distribution" subtitle="Platform account breakdown">
-          {pieData.length === 0 ? (
+        {/* Role Distribution Donut Chart */}
+        <div
+          style={{
+            background: 'var(--glass-bg)',
+            border: '1px solid var(--color-border)',
+            borderRadius: 'var(--radius-xl)',
+            padding: '1.5rem',
+            boxShadow: 'var(--shadow-sm)',
+          }}
+        >
+          <div style={{ fontWeight: 800, fontSize: '0.95rem', color: 'var(--color-text)', marginBottom: '0.2rem' }}>
+            Role Distribution
+          </div>
+          <div style={{ fontSize: '0.78rem', color: 'var(--color-muted)', marginBottom: '1.25rem' }}>
+            Platform account composition
+          </div>
+          {roleData.length === 0 ? (
             <div style={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-muted)', fontSize: '0.85rem' }}>
-              {loading ? <FiLoader style={{ animation: 'spin 1s linear infinite', fontSize: '1.5rem', color: '#7C3AED' }} /> : 'No data yet'}
+              No user role distribution data
             </div>
           ) : (
             <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-              <ResponsiveContainer width="55%" height={180}>
+              <ResponsiveContainer width="55%" height={190}>
                 <PieChart>
-                  <Pie data={pieData} cx="50%" cy="50%" innerRadius={45} outerRadius={72} paddingAngle={3} dataKey="value">
-                    {pieData.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
+                  <Pie data={roleData} cx="50%" cy="50%" innerRadius={45} outerRadius={70} paddingAngle={4} dataKey="value">
+                    {roleData.map((entry, i) => (
+                      <Cell key={i} fill={entry.fill || 'var(--color-primary)'} />
+                    ))}
                   </Pie>
                   <Tooltip contentStyle={CustomTooltipStyle} />
                 </PieChart>
               </ResponsiveContainer>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                {pieData.map((d) => (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                {roleData.map((d) => (
                   <div key={d.name} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <div style={{ width: 10, height: 10, borderRadius: '50%', background: d.fill, flexShrink: 0 }} />
+                    <div style={{ width: 10, height: 10, borderRadius: '50%', background: d.fill }} />
                     <div>
-                      <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--color-text)' }}>{d.value}</div>
-                      <div style={{ fontSize: '0.7rem', color: 'var(--color-muted)' }}>{d.name}</div>
+                      <div style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--color-text)' }}>{d.value}</div>
+                      <div style={{ fontSize: '0.72rem', color: 'var(--color-muted)' }}>{d.name}</div>
                     </div>
                   </div>
                 ))}
               </div>
             </div>
           )}
-        </ChartWrapper>
+        </div>
 
-        {/* Interview Trend Bar Chart */}
-        <ChartWrapper title="Interview Requests" subtitle="Weekly activity from Supabase">
-          {trendData.length === 0 ? (
+        {/* Revenue Trend Area Chart */}
+        <div
+          style={{
+            background: 'var(--glass-bg)',
+            border: '1px solid var(--color-border)',
+            borderRadius: 'var(--radius-xl)',
+            padding: '1.5rem',
+            boxShadow: 'var(--shadow-sm)',
+          }}
+        >
+          <div style={{ fontWeight: 800, fontSize: '0.95rem', color: 'var(--color-text)', marginBottom: '0.2rem' }}>
+            Revenue Accumulation Trend
+          </div>
+          <div style={{ fontSize: '0.78rem', color: 'var(--color-muted)', marginBottom: '1.25rem' }}>
+            Monthly gross subscription revenue (INR)
+          </div>
+          {revenueData.length === 0 ? (
             <div style={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-muted)', fontSize: '0.85rem' }}>
-              {loading ? <FiLoader style={{ animation: 'spin 1s linear infinite', fontSize: '1.5rem', color: '#06B6D4' }} /> : 'No interview data yet'}
+              No payments recorded yet
             </div>
           ) : (
-            <ResponsiveContainer width="100%" height={200}>
+            <ResponsiveContainer width="100%" height={210}>
+              <AreaChart data={revenueData} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="revenueGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="var(--color-success)" stopOpacity={0.4} />
+                    <stop offset="95%" stopColor="var(--color-success)" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
+                <XAxis dataKey="month" tick={{ fill: 'var(--color-muted)', fontSize: 11 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fill: 'var(--color-muted)', fontSize: 11 }} axisLine={false} tickLine={false} />
+                <Tooltip contentStyle={CustomTooltipStyle} />
+                <Area type="monotone" dataKey="Revenue" stroke="var(--color-success)" fillOpacity={1} fill="url(#revenueGrad)" strokeWidth={2.5} />
+              </AreaChart>
+            </ResponsiveContainer>
+          )}
+        </div>
+
+        {/* Interview Requests Bar Chart */}
+        <div
+          style={{
+            background: 'var(--glass-bg)',
+            border: '1px solid var(--color-border)',
+            borderRadius: 'var(--radius-xl)',
+            padding: '1.5rem',
+            boxShadow: 'var(--shadow-sm)',
+          }}
+        >
+          <div style={{ fontWeight: 800, fontSize: '0.95rem', color: 'var(--color-text)', marginBottom: '0.2rem' }}>
+            Interview Request Activity
+          </div>
+          <div style={{ fontSize: '0.78rem', color: 'var(--color-muted)', marginBottom: '1.25rem' }}>
+            Weekly scheduled technical mock drills
+          </div>
+          {trendData.length === 0 ? (
+            <div style={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-muted)', fontSize: '0.85rem' }}>
+              No interview requests data available
+            </div>
+          ) : (
+            <ResponsiveContainer width="100%" height={210}>
               <BarChart data={trendData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-                <XAxis dataKey="week" tick={{ fill: '#94A3B8', fontSize: 10 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fill: '#94A3B8', fontSize: 11 }} axisLine={false} tickLine={false} allowDecimals={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
+                <XAxis dataKey="week" tick={{ fill: 'var(--color-muted)', fontSize: 10 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fill: 'var(--color-muted)', fontSize: 11 }} axisLine={false} tickLine={false} allowDecimals={false} />
                 <Tooltip contentStyle={CustomTooltipStyle} />
                 <Legend iconType="circle" wrapperStyle={{ fontSize: 11, paddingTop: 8 }} />
-                <Bar dataKey="Total" fill="#06B6D4" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="Accepted" fill="#10B981" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="Pending" fill="#F59E0B" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="Total" fill="var(--color-accent)" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="Accepted" fill="var(--color-success)" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="Pending" fill="var(--color-warning)" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           )}
-        </ChartWrapper>
+        </div>
       </div>
 
-      {/* ── Live Activity Feed ── */}
-      <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 16, padding: '1.5rem' }}>
+      {/* Live System Activity Feed */}
+      <div
+        style={{
+          background: 'var(--glass-bg)',
+          border: '1px solid var(--color-border)',
+          borderRadius: 'var(--radius-xl)',
+          padding: '1.5rem',
+          boxShadow: 'var(--shadow-sm)',
+        }}
+      >
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem' }}>
           <div>
-            <div style={{ fontWeight: 800, fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <FiZap style={{ color: '#F59E0B' }} /> Live Activity Feed
+            <div style={{ fontWeight: 800, fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--color-text)' }}>
+              <FiZap style={{ color: 'var(--color-warning)' }} /> Live Platform Activity Feed
             </div>
-            <div style={{ fontSize: '0.75rem', color: 'var(--color-muted)', marginTop: 2 }}>Real-time platform events from Supabase</div>
+            <div style={{ fontSize: '0.78rem', color: 'var(--color-muted)', marginTop: 2 }}>
+              Real-time events streaming from Supabase notification service
+            </div>
           </div>
-          <span style={{ fontSize: '0.72rem', background: 'rgba(16,185,129,0.15)', color: '#10B981', padding: '0.2rem 0.6rem', borderRadius: 999, fontWeight: 700 }}>
-            ● LIVE
+          <span
+            style={{
+              fontSize: '0.72rem',
+              background: 'var(--color-primary-light)',
+              color: 'var(--color-primary)',
+              padding: '0.2rem 0.65rem',
+              borderRadius: 'var(--radius-full)',
+              fontWeight: 800,
+            }}
+          >
+            ● LIVE REALTIME
           </span>
         </div>
 
         {loading ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-            {[1, 2, 3, 4].map(i => (
-              <div key={i} style={{ height: 56, background: 'rgba(255,255,255,0.04)', borderRadius: 10, animation: 'pulse 1.5s infinite' }} />
+            {[1, 2, 3, 4].map((i) => (
+              <div
+                key={i}
+                style={{
+                  height: 54,
+                  background: 'var(--color-surface-sec)',
+                  borderRadius: 'var(--radius-md)',
+                  animation: 'adminPulse 1.5s infinite',
+                }}
+              />
             ))}
           </div>
         ) : activity.length === 0 ? (
-          <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-muted)', fontSize: '0.85rem' }}>
-            No recent activity. Events will appear here in real-time.
+          <div style={{ padding: '2.5rem', textAlign: 'center', color: 'var(--color-muted)', fontSize: '0.85rem' }}>
+            No platform activity events recorded yet.
           </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-            {activity.map((n) => {
-              const color = getColor(n.notification_type);
-              return (
-                <div key={n.id} style={{
-                  display: 'flex', gap: '0.85rem', alignItems: 'center',
-                  padding: '0.75rem 1rem', borderRadius: 10,
-                  background: `${color}0D`, border: `1px solid ${color}22`,
-                }}>
-                  <div style={{ width: 8, height: 8, borderRadius: '50%', background: color, flexShrink: 0 }} />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 700, fontSize: '0.85rem', color: 'var(--color-text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{n.title}</div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--color-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{n.message}</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+            {activity.map((n) => (
+              <div
+                key={n.id}
+                style={{
+                  display: 'flex',
+                  gap: '0.85rem',
+                  alignItems: 'center',
+                  padding: '0.8rem 1rem',
+                  borderRadius: 'var(--radius-lg)',
+                  background: 'var(--color-surface-sec)',
+                  border: '1px solid var(--color-border)',
+                }}
+              >
+                <div
+                  style={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: '50%',
+                    background: 'var(--color-primary)',
+                    flexShrink: 0,
+                  }}
+                />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 700, fontSize: '0.85rem', color: 'var(--color-text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {n.title}
                   </div>
-                  <div style={{ flexShrink: 0, textAlign: 'right' }}>
-                    <div style={{ fontSize: '0.7rem', color: 'var(--color-muted)' }}>{formatTime(n.created_at)}</div>
-                    <div style={{ fontSize: '0.65rem', color, fontWeight: 700, marginTop: 2, textTransform: 'uppercase' }}>{n.notification_type || 'system'}</div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--color-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {n.message}
                   </div>
                 </div>
-              );
-            })}
+                <div style={{ flexShrink: 0, textAlign: 'right' }}>
+                  <div style={{ fontSize: '0.7rem', color: 'var(--color-muted)' }}>{formatTime(n.created_at)}</div>
+                  <div style={{ fontSize: '0.65rem', color: 'var(--color-primary)', fontWeight: 800, marginTop: 2, textTransform: 'uppercase' }}>
+                    {n.notification_type || 'system'}
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </div>
-
-      <style>{`
-        @keyframes spin { to { transform: rotate(360deg); } }
-        @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.4; } }
-      `}</style>
-    </DashboardLayout>
+    </AdminLayout>
   );
 };
 

@@ -1,34 +1,22 @@
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
-
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  FiAlertCircle,
-  FiCalendar,
-  FiChevronLeft,
-  FiChevronRight,
-  FiClock,
-  FiLoader,
-  FiRefreshCw,
-  FiVideo,
+  FiAlertCircle, FiCalendar, FiChevronLeft, FiChevronRight, FiClock,
+  FiLoader, FiRefreshCw, FiVideo, FiUser, FiCheckCircle, FiPlus, FiX, FiLink, FiArrowRight
 } from "react-icons/fi";
-
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 
 import DashboardLayout from "../../components/Dashboard/DashboardLayout";
 import recruiterService from "../../services/recruiterService";
 import useRealtime from "../../hooks/useRealtime";
-
 import {
   getInterviewSessionPath,
   isInterviewScheduled,
+  formatInterviewDate,
+  formatInterviewTime,
+  formatTimeWindow,
+  getSessionTimeStatus,
 } from "../../utils/interviewSession";
-
-// import "./RecruiterSchedule.css";
 
 const getCandidateName = (session = {}) => {
   return (
@@ -36,981 +24,784 @@ const getCandidateName = (session = {}) => {
     session.student_name ||
     session.student?.full_name ||
     session.student?.name ||
-    `Candidate ${
-      session.student_id?.slice(0, 6) || ""
-    }`
+    `Candidate ${session.student_id?.slice(0, 6) || ""}`
   );
 };
 
-const getSessionType = (session = {}) => {
+const getCandidateEmail = (session = {}) => {
   return (
-    session.interview_type ||
-    "Technical Interview"
+    session.candidate_email ||
+    session.student_email ||
+    session.student?.email ||
+    ""
+  );
+};
+
+const getStudentId = (session = {}) => {
+  return (
+    session.student_id ||
+    session.student?.id ||
+    session.candidate_id ||
+    session.user_id ||
+    ""
   );
 };
 
 const getDateKey = (value) => {
-  if (!value) {
-    return "";
-  }
-
+  if (!value) return "";
   return String(value).slice(0, 10);
 };
 
-const formatDateHeading = (date) => {
-  return date.toLocaleDateString("en-IN", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
-};
-
-const formatShortDate = (value) => {
-  if (!value) {
-    return "Date not assigned";
-  }
-
-  const date = new Date(
-    `${value}T00:00:00`
-  );
-
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-
-  return date.toLocaleDateString("en-IN", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
-};
-
-const formatTime = (value) => {
-  if (!value) {
-    return "Time not assigned";
-  }
-
-  const [hours, minutes] = String(value)
-    .split(":")
-    .map(Number);
-
-  if (
-    Number.isNaN(hours) ||
-    Number.isNaN(minutes)
-  ) {
-    return value;
-  }
-
-  const date = new Date();
-
-  date.setHours(hours);
-  date.setMinutes(minutes);
-  date.setSeconds(0);
-
-  return date.toLocaleTimeString("en-IN", {
-    hour: "numeric",
-    minute: "2-digit",
-  });
-};
-
-const getMonthStart = (date) => {
-  return new Date(
-    date.getFullYear(),
-    date.getMonth(),
-    1
-  );
-};
-
-const getMonthEnd = (date) => {
-  return new Date(
-    date.getFullYear(),
-    date.getMonth() + 1,
-    0
-  );
-};
+const getMonthStart = (date) => new Date(date.getFullYear(), date.getMonth(), 1);
+const getMonthEnd = (date) => new Date(date.getFullYear(), date.getMonth() + 1, 0);
 
 const getCalendarDays = (monthDate) => {
-  const monthStart =
-    getMonthStart(monthDate);
-
-  const monthEnd =
-    getMonthEnd(monthDate);
-
+  const monthStart = getMonthStart(monthDate);
+  const monthEnd = getMonthEnd(monthDate);
   const firstDay = monthStart.getDay();
   const totalDays = monthEnd.getDate();
 
   const cells = [];
-
   for (let index = 0; index < firstDay; index += 1) {
     cells.push(null);
   }
-
-  for (
-    let day = 1;
-    day <= totalDays;
-    day += 1
-  ) {
-    cells.push(
-      new Date(
-        monthDate.getFullYear(),
-        monthDate.getMonth(),
-        day
-      )
-    );
+  for (let day = 1; day <= totalDays; day += 1) {
+    cells.push(new Date(monthDate.getFullYear(), monthDate.getMonth(), day));
   }
-
   while (cells.length % 7 !== 0) {
     cells.push(null);
   }
-
   return cells;
 };
 
 const isSameDay = (first, second) => {
-  if (!first || !second) {
-    return false;
-  }
-
+  if (!first || !second) return false;
   return (
-    first.getFullYear() ===
-      second.getFullYear() &&
+    first.getFullYear() === second.getFullYear() &&
     first.getMonth() === second.getMonth() &&
     first.getDate() === second.getDate()
   );
 };
 
-const RecruiterSchedule = () => {
+export const RecruiterSchedule = () => {
   const navigate = useNavigate();
+  const [requests, setRequests] = useState([]);
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [visibleMonth, setVisibleMonth] = useState(new Date(new Date().getFullYear(), new Date().getMonth(), 1));
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
-  const [requests, setRequests] =
-    useState([]);
+  // Schedule Modal state
+  const [schedulingReq, setSchedulingReq] = useState(null);
+  const [meetingDate, setMeetingDate] = useState("");
+  const [startTime, setStartTime] = useState("");
+  const [endTime, setEndTime] = useState("");
+  const [meetingLink, setMeetingLink] = useState("");
+  const [savingSchedule, setSavingSchedule] = useState(false);
 
-  const [selectedDate, setSelectedDate] =
-    useState(new Date());
+  const fetchSchedule = useCallback(async (isRefresh = false) => {
+    try {
+      if (isRefresh) setRefreshing(true);
+      else setLoading(true);
 
-  const [visibleMonth, setVisibleMonth] =
-    useState(
-      new Date(
-        new Date().getFullYear(),
-        new Date().getMonth(),
-        1
-      )
-    );
-
-  const [loading, setLoading] =
-    useState(true);
-
-  const [refreshing, setRefreshing] =
-    useState(false);
-
-  const [error, setError] =
-    useState("");
-
-  const fetchSchedule = useCallback(
-    async (isRefresh = false) => {
-      try {
-        if (isRefresh) {
-          setRefreshing(true);
-        } else {
-          setLoading(true);
-        }
-
-        setError("");
-
-        const data =
-          await recruiterService.getInterviewRequestsForRecruiter();
-
-        setRequests(
-          Array.isArray(data) ? data : []
-        );
-      } catch (fetchError) {
-        console.error(
-          "Failed to load recruiter schedule:",
-          fetchError
-        );
-
-        setError(
-          fetchError?.message ||
-            "Failed to load the schedule."
-        );
-      } finally {
-        setLoading(false);
-        setRefreshing(false);
-      }
-    },
-    []
-  );
+      const data = await recruiterService.getInterviewRequestsForRecruiter();
+      setRequests(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error("Failed to load recruiter schedule:", err);
+      toast.error("Failed to load schedule.");
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
 
   useEffect(() => {
     fetchSchedule();
   }, [fetchSchedule]);
 
-  useRealtime(
-    [
-      "interview_requests",
-      "notifications",
-    ],
-    () => fetchSchedule(true)
-  );
+  useRealtime(["interview_requests", "notifications"], () => fetchSchedule(true));
 
+  // Filter unscheduled accepted requests
+  const unscheduledAccepted = useMemo(() => {
+    return requests.filter((r) => {
+      const status = String(r.status || "").toLowerCase();
+      const isAcceptedStatus =
+        status === "accepted" ||
+        status === "reschedule_accepted" ||
+        status === "waiting_recruiter_confirmation";
+      const isScheduled = Boolean(r.meeting_date && (r.meeting_time || r.start_time));
+      return isAcceptedStatus && !isScheduled;
+    });
+  }, [requests]);
+
+  // Scheduled sessions sorted by date & time
   const scheduledSessions = useMemo(() => {
     return requests
-      .filter((request) =>
-        isInterviewScheduled(request)
-      )
-      .sort((first, second) => {
-        const firstValue = `${first.meeting_date}T${first.meeting_time}`;
-        const secondValue = `${second.meeting_date}T${second.meeting_time}`;
-
-        return (
-          new Date(firstValue).getTime() -
-          new Date(secondValue).getTime()
-        );
+      .filter((r) => Boolean(r.meeting_date && (r.meeting_time || r.start_time)))
+      .sort((a, b) => {
+        const first = `${a.meeting_date}T${a.start_time || a.meeting_time || "00:00"}`;
+        const second = `${b.meeting_date}T${b.start_time || b.meeting_time || "00:00"}`;
+        return new Date(first).getTime() - new Date(second).getTime();
       });
   }, [requests]);
 
-  const unscheduledAccepted = useMemo(() => {
-    return requests.filter((request) => {
-      const status = String(
-        request.status || ""
-      ).toLowerCase();
-
-      return (
-        (
-          status === "accepted" ||
-          status === "reschedule_accepted" ||
-          status ===
-            "waiting_recruiter_confirmation" ||
-          status === "reschedule_requested"
-        ) &&
-        !isInterviewScheduled(request)
-      );
-    });
-  }, [requests]);
-
+  // Sessions for the currently selected date
   const sessionsForSelectedDate = useMemo(() => {
-    const dateKey = selectedDate
-      .toISOString()
-      .slice(0, 10);
-
-    return scheduledSessions.filter(
-      (session) =>
-        getDateKey(session.meeting_date) ===
-        dateKey
-    );
+    const dateKey = selectedDate.toISOString().slice(0, 10);
+    return scheduledSessions.filter((s) => getDateKey(s.meeting_date) === dateKey);
   }, [scheduledSessions, selectedDate]);
 
+  // Group scheduled dates for calendar dot indicator
   const sessionsByDate = useMemo(() => {
-    const result = new Map();
-
-    scheduledSessions.forEach((session) => {
-      const key = getDateKey(
-        session.meeting_date
-      );
-
-      if (!key) {
-        return;
-      }
-
-      const current = result.get(key) || [];
-
-      result.set(key, [
-        ...current,
-        session,
-      ]);
+    const map = new Map();
+    scheduledSessions.forEach((s) => {
+      const key = getDateKey(s.meeting_date);
+      if (!key) return;
+      const current = map.get(key) || [];
+      map.set(key, [...current, s]);
     });
-
-    return result;
+    return map;
   }, [scheduledSessions]);
 
-  const calendarDays =
-    useMemo(
-      () => getCalendarDays(visibleMonth),
-      [visibleMonth]
-    );
+  const calendarDays = useMemo(() => getCalendarDays(visibleMonth), [visibleMonth]);
 
-  const goToPreviousMonth = () => {
-    setVisibleMonth(
-      (current) =>
-        new Date(
-          current.getFullYear(),
-          current.getMonth() - 1,
-          1
-        )
-    );
+  const openScheduleModal = (req) => {
+    setSchedulingReq(req);
+    const todayStr = new Date().toISOString().slice(0, 10);
+    setMeetingDate(req.meeting_date || todayStr);
+    setStartTime(req.start_time || req.meeting_time || "10:00");
+    setEndTime(req.end_time || "11:00");
+    setMeetingLink(req.meeting_link || `/interviews/session/${req.id}`);
   };
 
-  const goToNextMonth = () => {
-    setVisibleMonth(
-      (current) =>
-        new Date(
-          current.getFullYear(),
-          current.getMonth() + 1,
-          1
-        )
-    );
-  };
+  const handleSaveSchedule = async (e) => {
+    e.preventDefault();
+    if (!schedulingReq) return;
 
-  const goToToday = () => {
-    const today = new Date();
+    const requestId = schedulingReq.id || schedulingReq.request_id;
+    const candidateUserId = getStudentId(schedulingReq);
+    const candidateName = getCandidateName(schedulingReq);
 
-    setSelectedDate(today);
-
-    setVisibleMonth(
-      new Date(
-        today.getFullYear(),
-        today.getMonth(),
-        1
-      )
-    );
-  };
-
-  const handleSelectDate = (date) => {
-    setSelectedDate(date);
-
-    setVisibleMonth(
-      new Date(
-        date.getFullYear(),
-        date.getMonth(),
-        1
-      )
-    );
-  };
-
-  const handleJoin = (session) => {
-    if (!isInterviewScheduled(session)) {
-      toast.error(
-        "This session does not have a complete assigned slot."
-      );
+    if (!requestId || !candidateUserId) {
+      toast.error("Candidate or request information is missing.");
       return;
     }
 
-    navigate(
-      getInterviewSessionPath(session.id)
-    );
+    if (!meetingDate || !startTime || !endTime) {
+      toast.error("Please provide meeting date, start time, and end time.");
+      return;
+    }
+
+    try {
+      setSavingSchedule(true);
+      await recruiterService.assignInterviewSlot({
+        requestId,
+        candidateUserId,
+        meetingDate,
+        startTime,
+        endTime,
+        meetingLink: meetingLink || `/interviews/session/${requestId}`,
+      });
+
+      toast.success(`Session successfully scheduled with ${candidateName}!`);
+      setSchedulingReq(null);
+      fetchSchedule(true);
+    } catch (err) {
+      console.error("Failed to assign schedule slot:", err);
+      toast.error(err?.message || "Failed to schedule session.");
+    } finally {
+      setSavingSchedule(false);
+    }
+  };
+
+  const goToPreviousMonth = () => {
+    setVisibleMonth((c) => new Date(c.getFullYear(), c.getMonth() - 1, 1));
+  };
+
+  const goToNextMonth = () => {
+    setVisibleMonth((c) => new Date(c.getFullYear(), c.getMonth() + 1, 1));
   };
 
   return (
-    <DashboardLayout title="Recruiter Schedule">
-      <main
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          gap: "1rem",
-        }}
-      >
-        <section
+    <DashboardLayout title="Interview Schedule">
+      <div style={{ display: "flex", flexDirection: "column", gap: "1.75rem", width: "100%" }}>
+        
+        {/* Top Header */}
+        <div
           className="glass-card"
           style={{
-            padding: "1.25rem",
+            padding: "1.25rem 1.5rem",
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
-            gap: "1rem",
             flexWrap: "wrap",
+            gap: "1rem",
+            borderRadius: "var(--radius-xl)",
           }}
         >
           <div>
-            <h1
-              style={{
-                margin: 0,
-                fontSize: "1.35rem",
-                fontWeight: 800,
-              }}
-            >
-              Interview Schedule
+            <h1 style={{ margin: 0, fontSize: "1.35rem", fontWeight: 800, color: "var(--color-text)" }}>
+              Interview Scheduling Hub
             </h1>
-
-            <p
-              style={{
-                margin: "0.3rem 0 0",
-                color: "var(--color-muted)",
-                fontSize: "0.84rem",
-              }}
-            >
-              View assigned interview sessions
-              and join scheduled rooms.
+            <p style={{ margin: "0.25rem 0 0", color: "var(--color-muted)", fontSize: "0.85rem" }}>
+              Interactive calendar schedule, daily session details, and slot assignment workspace.
             </p>
           </div>
 
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "0.6rem",
-              flexWrap: "wrap",
-            }}
-          >
+          <div style={{ display: "flex", gap: "0.6rem", flexWrap: "wrap" }}>
             <button
-              type="button"
-              onClick={goToToday}
-              className="btn btn-outline"
-            >
-              Today
-            </button>
-
-            <button
-              type="button"
-              onClick={() =>
-                fetchSchedule(true)
-              }
+              onClick={() => fetchSchedule(true)}
               className="btn btn-secondary"
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "0.35rem",
-              }}
+              style={{ display: "inline-flex", alignItems: "center", gap: "0.4rem", fontSize: "0.82rem" }}
             >
-              <FiRefreshCw
-                className={
-                  refreshing
-                    ? "spin-animation"
-                    : ""
-                }
-              />
-              Refresh
+              <FiRefreshCw className={refreshing ? "spin-animation" : ""} /> Refresh
+            </button>
+            <button
+              onClick={() => navigate("/recruiter/interviews")}
+              className="btn btn-primary"
+              style={{ display: "inline-flex", alignItems: "center", gap: "0.4rem", fontSize: "0.82rem" }}
+            >
+              <FiVideo /> Live Interviews Studio <FiArrowRight />
             </button>
           </div>
-        </section>
+        </div>
 
-        {unscheduledAccepted.length > 0 && (
-          <section
-            className="glass-card"
-            style={{
-              padding: "1rem 1.15rem",
-              border:
-                "1px solid rgba(245, 158, 11, 0.35)",
-              background:
-                "rgba(245, 158, 11, 0.08)",
-            }}
-          >
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                gap: "1rem",
-                flexWrap: "wrap",
-              }}
-            >
+        {/* ── 1. FIRST: Interactive Calendar Widget (Full Width) ── */}
+        <div className="glass-card" style={{ padding: "1.75rem", borderRadius: "var(--radius-xl)", width: "100%", boxSizing: "border-box" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem", flexWrap: "wrap", gap: "1rem" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
+              <div style={{ width: 38, height: 38, borderRadius: 10, background: "rgba(99, 102, 241, 0.12)", color: "var(--color-primary)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.15rem" }}>
+                <FiCalendar />
+              </div>
               <div>
-                <strong
-                  style={{
-                    display: "block",
-                    color: "#92400e",
-                  }}
-                >
-                  {unscheduledAccepted.length} accepted
-                  request
-                  {unscheduledAccepted.length === 1
-                    ? ""
-                    : "s"}{" "}
-                  need scheduling
-                </strong>
-
-                <span
-                  style={{
-                    color: "#92400e",
-                    fontSize: "0.82rem",
-                  }}
-                >
-                  Assign the final date and time
-                  before joining the room.
+                <h2 style={{ margin: 0, fontSize: "1.2rem", fontWeight: 800, color: "var(--color-text)" }}>
+                  {visibleMonth.toLocaleDateString("en-IN", { month: "long", year: "numeric" })}
+                </h2>
+                <span style={{ fontSize: "0.78rem", color: "var(--color-muted)" }}>
+                  Click on any date to inspect scheduled sessions
                 </span>
               </div>
-
-              <button
-                type="button"
-                onClick={() =>
-                  navigate(
-                    "/recruiter/candidates"
-                  )
-                }
-                className="btn btn-primary"
-              >
-                Schedule Sessions
-              </button>
             </div>
-          </section>
-        )}
 
-        {loading ? (
-          <section
-            className="glass-card"
-            style={{
-              padding: "3rem",
-              textAlign: "center",
-              color: "var(--color-muted)",
-            }}
-          >
-            <FiLoader
-              className="spin-animation"
-              style={{
-                fontSize: "2rem",
-                marginBottom: "0.75rem",
-              }}
-            />
-
-            <p style={{ margin: 0 }}>
-              Loading schedule...
-            </p>
-          </section>
-        ) : error ? (
-          <section
-            className="glass-card"
-            style={{
-              padding: "2rem",
-              textAlign: "center",
-              color: "#dc2626",
-            }}
-          >
-            <FiAlertCircle
-              style={{
-                fontSize: "2rem",
-                marginBottom: "0.6rem",
-              }}
-            />
-
-            <p>{error}</p>
-
-            <button
-              type="button"
-              onClick={() =>
-                fetchSchedule(true)
-              }
-              className="btn btn-primary"
-            >
-              Try Again
-            </button>
-          </section>
-        ) : (
-          <section
-            className="glass-card"
-            style={{
-              padding: "1.25rem",
-            }}
-          >
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                gap: "1rem",
-                marginBottom: "1rem",
-              }}
-            >
+            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
               <button
                 type="button"
+                onClick={() => setSelectedDate(new Date())}
+                className="btn btn-secondary"
+                style={{ padding: "0.4rem 0.85rem", fontSize: "0.8rem", fontWeight: 700 }}
+              >
+                Today
+              </button>
+              <button
                 onClick={goToPreviousMonth}
-                className="btn btn-outline"
-                aria-label="Previous month"
+                className="btn btn-secondary"
+                style={{ padding: "0.4rem 0.75rem", fontSize: "0.95rem" }}
+                aria-label="Previous Month"
               >
                 <FiChevronLeft />
               </button>
-
-              <h2
-                style={{
-                  margin: 0,
-                  fontSize: "1.1rem",
-                  fontWeight: 800,
-                }}
-              >
-                {visibleMonth.toLocaleDateString(
-                  "en-IN",
-                  {
-                    month: "long",
-                    year: "numeric",
-                  }
-                )}
-              </h2>
-
               <button
-                type="button"
                 onClick={goToNextMonth}
-                className="btn btn-outline"
-                aria-label="Next month"
+                className="btn btn-secondary"
+                style={{ padding: "0.4rem 0.75rem", fontSize: "0.95rem" }}
+                aria-label="Next Month"
               >
                 <FiChevronRight />
               </button>
             </div>
+          </div>
 
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns:
-                  "repeat(7, minmax(0, 1fr))",
-                gap: "0.4rem",
-                marginBottom: "0.4rem",
-              }}
-            >
-              {[
-                "Sun",
-                "Mon",
-                "Tue",
-                "Wed",
-                "Thu",
-                "Fri",
-                "Sat",
-              ].map((day) => (
-                <div
-                  key={day}
+          {/* Weekdays Grid */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", textAlign: "center", fontSize: "0.8rem", fontWeight: 800, color: "var(--color-muted)", marginBottom: "0.75rem", letterSpacing: "0.03em" }}>
+            {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
+              <div key={day} style={{ padding: "0.35rem 0" }}>{day}</div>
+            ))}
+          </div>
+
+          {/* Days Grid */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: "6px" }}>
+            {calendarDays.map((date, index) => {
+              if (!date) {
+                return <div key={`empty-${index}`} style={{ minHeight: 52 }} />;
+              }
+
+              const isSelected = isSameDay(date, selectedDate);
+              const isToday = isSameDay(date, new Date());
+              const dateKey = getDateKey(date.toISOString());
+              const daySessions = sessionsByDate.get(dateKey) || [];
+              const hasSessions = daySessions.length > 0;
+
+              return (
+                <button
+                  key={date.toISOString()}
+                  onClick={() => setSelectedDate(date)}
+                  type="button"
                   style={{
-                    textAlign: "center",
-                    color: "var(--color-muted)",
-                    fontSize: "0.75rem",
-                    fontWeight: 800,
-                    padding: "0.35rem",
+                    minHeight: 52,
+                    padding: "0.4rem 0.2rem",
+                    borderRadius: "var(--radius-md, 10px)",
+                    border: isSelected ? "2px solid var(--color-primary)" : "1px solid var(--color-border)",
+                    background: isSelected
+                      ? "var(--color-primary-light, rgba(99, 102, 241, 0.15))"
+                      : isToday
+                      ? "rgba(16, 185, 129, 0.08)"
+                      : "var(--color-surface)",
+                    color: isSelected ? "var(--color-primary)" : "var(--color-text)",
+                    fontWeight: isSelected || isToday ? 850 : 600,
+                    fontSize: "0.95rem",
+                    cursor: "pointer",
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    position: "relative",
+                    transition: "all 0.15s ease",
                   }}
                 >
-                  {day}
-                </div>
-              ))}
-            </div>
-
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns:
-                  "repeat(7, minmax(0, 1fr))",
-                gap: "0.4rem",
-              }}
-            >
-              {calendarDays.map((date, index) => {
-                if (!date) {
-                  return (
-                    <div
-                      key={`empty-${index}`}
-                      style={{
-                        minHeight: 82,
-                      }}
-                    />
-                  );
-                }
-
-                const dateKey = date
-                  .toISOString()
-                  .slice(0, 10);
-
-                const daySessions =
-                  sessionsByDate.get(
-                    dateKey
-                  ) || [];
-
-                const isSelected =
-                  isSameDay(
-                    date,
-                    selectedDate
-                  );
-
-                const isToday =
-                  isSameDay(
-                    date,
-                    new Date()
-                  );
-
-                return (
-                  <button
-                    key={dateKey}
-                    type="button"
-                    onClick={() =>
-                      handleSelectDate(date)
-                    }
-                    style={{
-                      minHeight: 82,
-                      textAlign: "left",
-                      padding: "0.55rem",
-                      borderRadius: 10,
-                      border: isSelected
-                        ? "2px solid #14b8a6"
-                        : "1px solid #e2e8f0",
-                      background: isSelected
-                        ? "rgba(20, 184, 166, 0.12)"
-                        : "#ffffff",
-                      cursor: "pointer",
-                      color: "var(--color-text)",
-                    }}
-                  >
-                    <div
-                      style={{
-                        display: "flex",
-                        justifyContent:
-                          "space-between",
-                        alignItems: "center",
-                        marginBottom: "0.35rem",
-                      }}
-                    >
+                  <span>{date.getDate()}</span>
+                  {hasSessions && (
+                    <div style={{ display: "flex", alignItems: "center", gap: 3, marginTop: 4 }}>
                       <span
                         style={{
-                          width: 24,
-                          height: 24,
-                          display: "inline-flex",
-                          alignItems: "center",
-                          justifyContent: "center",
+                          width: 7,
+                          height: 7,
                           borderRadius: "50%",
-                          background: isToday
-                            ? "#14b8a6"
-                            : "transparent",
-                          color: isToday
-                            ? "#ffffff"
-                            : "inherit",
-                          fontWeight: 800,
-                          fontSize: "0.78rem",
+                          background: isSelected ? "var(--color-primary)" : "#10B981",
                         }}
-                      >
-                        {date.getDate()}
-                      </span>
-
-                      {daySessions.length > 0 && (
-                        <span
-                          style={{
-                            fontSize: "0.68rem",
-                            fontWeight: 800,
-                            color: "#0f766e",
-                          }}
-                        >
+                      />
+                      {daySessions.length > 1 && (
+                        <span style={{ fontSize: "0.65rem", fontWeight: 800, color: isSelected ? "var(--color-primary)" : "#10B981" }}>
                           {daySessions.length}
                         </span>
                       )}
                     </div>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
 
-                    <div
-                      style={{
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: "0.2rem",
-                      }}
-                    >
-                      {daySessions
-                        .slice(0, 2)
-                        .map((session) => (
-                          <span
-                            key={session.id}
-                            style={{
-                              display: "block",
-                              overflow: "hidden",
-                              whiteSpace:
-                                "nowrap",
-                              textOverflow:
-                                "ellipsis",
-                              fontSize: "0.67rem",
-                              color: "#0f766e",
-                              fontWeight: 700,
-                            }}
-                          >
-                            {formatTime(
-                              session.meeting_time
-                            )}{" "}
-                            ·{" "}
-                            {getCandidateName(
-                              session
-                            )}
-                          </span>
-                        ))}
-
-                      {daySessions.length > 2 && (
-                        <span
-                          style={{
-                            fontSize: "0.67rem",
-                            color: "var(--color-muted)",
-                          }}
-                        >
-                          +{daySessions.length - 2} more
-                        </span>
-                      )}
-                    </div>
-                  </button>
-                );
-              })}
+        {/* ── 2. THEN: Selected Day's Agenda Details (Full Width) ── */}
+        <div className="glass-card" style={{ padding: "1.75rem", borderRadius: "var(--radius-xl)", width: "100%", boxSizing: "border-box" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.25rem", flexWrap: "wrap", gap: "0.5rem" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
+              <div style={{ width: 38, height: 38, borderRadius: 10, background: "rgba(16, 185, 129, 0.12)", color: "#10B981", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.15rem" }}>
+                <FiClock />
+              </div>
+              <div>
+                <h3 style={{ margin: 0, fontSize: "1.15rem", fontWeight: 800, color: "var(--color-text)" }}>
+                  Agenda for {selectedDate.toLocaleDateString("en-IN", { weekday: "long", month: "long", day: "numeric", year: "numeric" })}
+                </h3>
+                <span style={{ fontSize: "0.78rem", color: "var(--color-muted)" }}>
+                  {sessionsForSelectedDate.length} drill session(s) scheduled on this day
+                </span>
+              </div>
             </div>
-          </section>
-        )}
 
-        <section
-          className="glass-card"
-          style={{
-            padding: "1.25rem",
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              gap: "1rem",
-              flexWrap: "wrap",
-              marginBottom: "1rem",
-            }}
-          >
-            <div>
-              <h2
-                style={{
-                  margin: 0,
-                  fontSize: "1.1rem",
-                  fontWeight: 800,
-                }}
-              >
-                {formatDateHeading(
-                  selectedDate
-                )}
-              </h2>
-
-              <p
-                style={{
-                  margin: "0.3rem 0 0",
-                  color: "var(--color-muted)",
-                  fontSize: "0.82rem",
-                }}
-              >
-                {sessionsForSelectedDate.length}{" "}
-                scheduled session
-                {sessionsForSelectedDate.length === 1
-                  ? ""
-                  : "s"}
-              </p>
-            </div>
+            <span style={{ fontSize: "0.8rem", color: "var(--color-primary)", fontWeight: 800, background: "var(--color-primary-light, rgba(99,102,241,0.12))", padding: "0.3rem 0.8rem", borderRadius: 999 }}>
+              {sessionsForSelectedDate.length} Active Slot(s)
+            </span>
           </div>
 
           {sessionsForSelectedDate.length === 0 ? (
-            <div
-              style={{
-                padding: "2rem",
-                textAlign: "center",
-                color: "var(--color-muted)",
-              }}
-            >
-              <FiCalendar
-                style={{
-                  fontSize: "2.3rem",
-                  opacity: 0.45,
-                  marginBottom: "0.65rem",
-                }}
-              />
-
-              <p style={{ margin: 0 }}>
-                No interview sessions scheduled
-                for this date.
+            <div style={{ textAlign: "center", padding: "3rem 1rem", color: "var(--color-muted)", background: "var(--color-surface-sec, rgba(0,0,0,0.02))", borderRadius: "var(--radius-lg)", border: "1px dashed var(--color-border)" }}>
+              <FiCalendar size={40} style={{ opacity: 0.35, marginBottom: "0.6rem" }} />
+              <div style={{ fontWeight: 800, fontSize: "1rem", color: "var(--color-text)" }}>No sessions scheduled for this day</div>
+              <p style={{ margin: "0.35rem auto 0", fontSize: "0.84rem", maxWidth: 450 }}>
+                Pick another date on the calendar above or assign schedule slots to accepted candidates below.
               </p>
             </div>
           ) : (
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: "0.75rem",
-              }}
-            >
-              {sessionsForSelectedDate.map(
-                (session) => (
+            <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+              {sessionsForSelectedDate.map((session) => {
+                const timeStatus = getSessionTimeStatus(session);
+                const candidateName = getCandidateName(session);
+                const candidateEmail = getCandidateEmail(session);
+
+                return (
                   <div
                     key={session.id}
                     style={{
+                      padding: "1.25rem",
+                      borderRadius: "var(--radius-lg, 14px)",
+                      background: "var(--color-surface)",
+                      border: "1px solid var(--color-border)",
                       display: "flex",
-                      justifyContent:
-                        "space-between",
+                      justifyContent: "space-between",
                       alignItems: "center",
-                      gap: "1rem",
-                      padding: "1rem",
-                      borderRadius: 10,
-                      border:
-                        "1px solid rgba(20, 184, 166, 0.25)",
-                      background:
-                        "rgba(20, 184, 166, 0.07)",
                       flexWrap: "wrap",
+                      gap: "1rem",
+                      boxShadow: "var(--shadow-sm)",
                     }}
                   >
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "0.8rem",
-                      }}
-                    >
+                    <div style={{ display: "flex", alignItems: "center", gap: "1rem", minWidth: 260, flex: 1 }}>
                       <div
                         style={{
-                          width: 42,
-                          height: 42,
+                          width: 46,
+                          height: 46,
+                          borderRadius: "50%",
+                          background: "linear-gradient(135deg, #6366f1, #8b5cf6)",
+                          color: "#fff",
                           display: "flex",
                           alignItems: "center",
                           justifyContent: "center",
-                          borderRadius: "50%",
-                          background: "#ccfbf1",
-                          color: "#0f766e",
+                          fontWeight: 800,
+                          fontSize: "1.1rem",
+                          flexShrink: 0,
                         }}
                       >
-                        <FiCalendar />
+                        {candidateName.charAt(0).toUpperCase()}
                       </div>
-
-                      <div>
-                        <strong
-                          style={{
-                            display: "block",
-                            color: "var(--color-text)",
-                          }}
-                        >
-                          {getCandidateName(
-                            session
-                          )}
-                        </strong>
-
-                        <span
-                          style={{
-                            display: "block",
-                            marginTop: "0.2rem",
-                            color: "var(--color-primary)",
-                            fontSize: "0.82rem",
-                            fontWeight: 700,
-                          }}
-                        >
-                          {getSessionType(
-                            session
-                          )}
-                        </span>
-
-                        <span
-                          style={{
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: "0.3rem",
-                            marginTop: "0.35rem",
-                            color: "var(--color-muted)",
-                            fontSize: "0.82rem",
-                          }}
-                        >
+                      <div style={{ display: "flex", flexDirection: "column", gap: "0.2rem" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", flexWrap: "wrap" }}>
+                          <strong style={{ fontWeight: 800, fontSize: "1rem", color: "var(--color-text)" }}>
+                            {candidateName}
+                          </strong>
+                          <span
+                            style={{
+                              padding: "0.2rem 0.6rem",
+                              borderRadius: "999px",
+                              background: timeStatus.bg,
+                              color: timeStatus.color,
+                              fontSize: "0.72rem",
+                              fontWeight: 800,
+                            }}
+                          >
+                            {timeStatus.label}
+                          </span>
+                        </div>
+                        <div style={{ fontSize: "0.82rem", color: "var(--color-muted)" }}>
+                          {candidateEmail || session.interview_type || "Technical Deep Dive"}
+                        </div>
+                        <div style={{ fontSize: "0.8rem", color: "var(--color-primary)", display: "flex", alignItems: "center", gap: "0.4rem", marginTop: "0.15rem" }}>
                           <FiClock />
-                          {formatShortDate(
-                            session.meeting_date
-                          )}{" "}
-                          ·{" "}
-                          {formatTime(
-                            session.meeting_time
-                          )}
-                        </span>
+                          <strong>Time Window:</strong> {formatTimeWindow(session)}
+                        </div>
+                        {session.meeting_link && (
+                          <div style={{ fontSize: "0.76rem", color: "var(--color-muted)", wordBreak: "break-all", display: "flex", alignItems: "center", gap: "0.35rem" }}>
+                            <FiLink /> {session.meeting_link}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div style={{ display: "flex", gap: "0.6rem", alignItems: "center", flexWrap: "wrap" }}>
+                      <button
+                        type="button"
+                        onClick={() => openScheduleModal(session)}
+                        className="btn btn-secondary"
+                        style={{ fontSize: "0.82rem", padding: "0.55rem 1rem", fontWeight: 700 }}
+                      >
+                        Edit Slot
+                      </button>
+                      <button
+                        type="button"
+                        disabled={!timeStatus.canJoin}
+                        onClick={() => {
+                          if (session.meeting_link && session.meeting_link.startsWith("http")) {
+                            window.open(session.meeting_link, "_blank");
+                          } else {
+                            navigate(getInterviewSessionPath(session.id));
+                          }
+                        }}
+                        className="btn btn-primary"
+                        style={{
+                          fontSize: "0.82rem",
+                          padding: "0.55rem 1.15rem",
+                          fontWeight: 700,
+                          background: timeStatus.canJoin ? "linear-gradient(135deg, #10b981, #059669)" : undefined,
+                          opacity: timeStatus.canJoin ? 1 : 0.6,
+                          cursor: timeStatus.canJoin ? "pointer" : "not-allowed",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "0.4rem",
+                        }}
+                      >
+                        <FiVideo /> {timeStatus.isEnded ? "Session Ended" : timeStatus.canJoin ? "Join Live Studio" : "Upcoming Window"}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* ── 3. THEN: Assignment Schedule Part (Full Width) ── */}
+        <div
+          className="glass-card"
+          style={{
+            padding: "1.75rem",
+            borderRadius: "var(--radius-xl)",
+            border: "1px solid rgba(245, 158, 11, 0.35)",
+            background: "linear-gradient(135deg, rgba(245, 158, 11, 0.05), rgba(99, 102, 241, 0.04))",
+            width: "100%",
+            boxSizing: "border-box",
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.25rem", flexWrap: "wrap", gap: "0.75rem" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
+              <div style={{ width: 38, height: 38, borderRadius: 10, background: "rgba(245, 158, 11, 0.14)", color: "#F59E0B", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.15rem" }}>
+                <FiClock />
+              </div>
+              <div>
+                <h2 style={{ margin: 0, fontSize: "1.15rem", fontWeight: 800, color: "var(--color-text)" }}>
+                  Assignment Schedule Hub — Accepted Requests ({unscheduledAccepted.length})
+                </h2>
+                <p style={{ margin: "0.2rem 0 0", fontSize: "0.8rem", color: "var(--color-muted)" }}>
+                  Assign interview dates, specific start &amp; end times, and meeting links for accepted applicants.
+                </p>
+              </div>
+            </div>
+
+            {unscheduledAccepted.length > 0 && (
+              <span style={{ fontSize: "0.78rem", color: "#F59E0B", fontWeight: 800, background: "rgba(245, 158, 11, 0.14)", padding: "0.3rem 0.8rem", borderRadius: 999 }}>
+                ⚡ Action Required
+              </span>
+            )}
+          </div>
+
+          {unscheduledAccepted.length === 0 ? (
+            <div style={{ textAlign: "center", padding: "2.5rem 1rem", background: "var(--color-surface)", borderRadius: "var(--radius-lg)", border: "1px solid var(--color-border)" }}>
+              <FiCheckCircle size={36} style={{ color: "#10B981", marginBottom: "0.5rem" }} />
+              <div style={{ fontWeight: 800, fontSize: "0.95rem", color: "var(--color-text)" }}>All accepted candidates are scheduled!</div>
+              <p style={{ margin: "0.25rem 0 0", fontSize: "0.82rem", color: "var(--color-muted)" }}>
+                No pending accepted requests waiting for slot assignment. Check the Candidates tab to review new applications.
+              </p>
+            </div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.9rem" }}>
+              {unscheduledAccepted.map((req) => {
+                const name = getCandidateName(req);
+                const email = getCandidateEmail(req);
+
+                return (
+                  <div
+                    key={req.id}
+                    style={{
+                      padding: "1.15rem 1.25rem",
+                      borderRadius: "var(--radius-lg)",
+                      background: "var(--color-surface)",
+                      border: "1px solid var(--color-border)",
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      flexWrap: "wrap",
+                      gap: "1rem",
+                      boxShadow: "var(--shadow-sm)",
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: "1rem", minWidth: 260, flex: 1 }}>
+                      <img
+                        src={
+                          req.candidate_avatar ||
+                          `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=4f46e5&color=fff&size=80`
+                        }
+                        alt={name}
+                        style={{ width: 48, height: 48, borderRadius: "50%", border: "2px solid var(--color-primary)", flexShrink: 0 }}
+                      />
+                      <div>
+                        <div style={{ fontWeight: 800, fontSize: "0.98rem", color: "var(--color-text)" }}>
+                          {name}
+                        </div>
+                        <div style={{ fontSize: "0.82rem", color: "var(--color-muted)" }}>
+                          {email || req.interview_type || "Technical Deep Dive"}
+                        </div>
+                        <div style={{ fontSize: "0.78rem", color: "var(--color-primary)", marginTop: "0.2rem", fontWeight: 600 }}>
+                          📅 Candidate Preferred Window: {req.preferred_datetime ? new Date(req.preferred_datetime).toLocaleString() : "Flexible"}
+                        </div>
                       </div>
                     </div>
 
                     <button
                       type="button"
-                      onClick={() =>
-                        handleJoin(session)
-                      }
+                      onClick={() => openScheduleModal(req)}
                       className="btn btn-primary"
                       style={{
+                        padding: "0.6rem 1.25rem",
+                        fontSize: "0.85rem",
+                        fontWeight: 700,
                         display: "inline-flex",
                         alignItems: "center",
-                        gap: "0.4rem",
+                        gap: "0.45rem",
+                        background: "linear-gradient(135deg, #10b981, #059669)",
+                        boxShadow: "0 4px 14px rgba(16, 185, 129, 0.28)",
                       }}
                     >
-                      <FiVideo />
-                      Join Meeting
+                      <FiCalendar /> Assign Schedule &amp; Link
                     </button>
                   </div>
-                )
-              )}
+                );
+              })}
             </div>
           )}
-        </section>
-      </main>
+        </div>
+
+        {/* Schedule / Slot Assignment Modal */}
+        {schedulingReq && (
+          <div
+            style={{
+              position: "fixed",
+              inset: 0,
+              zIndex: 1200,
+              background: "rgba(0, 0, 0, 0.75)",
+              backdropFilter: "blur(6px)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: "1rem",
+            }}
+          >
+            <form
+              onSubmit={handleSaveSchedule}
+              className="glass-card"
+              style={{
+                width: "100%",
+                maxWidth: 520,
+                padding: "2rem",
+                borderRadius: "var(--radius-xl)",
+                background: "var(--color-surface)",
+                boxShadow: "var(--shadow-xl)",
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.25rem" }}>
+                <h3 style={{ margin: 0, fontSize: "1.2rem", fontWeight: 800, color: "var(--color-text)", display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                  <FiCalendar style={{ color: "var(--color-primary)" }} /> Assign Interview Session
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setSchedulingReq(null)}
+                  disabled={savingSchedule}
+                  style={{ border: "none", background: "none", color: "var(--color-muted)", cursor: "pointer", fontSize: "1.25rem" }}
+                >
+                  <FiX />
+                </button>
+              </div>
+
+              <p style={{ margin: "0 0 1.25rem", fontSize: "0.85rem", color: "var(--color-muted)" }}>
+                Assign schedule parameters for candidate <strong>{getCandidateName(schedulingReq)}</strong>.
+              </p>
+
+              {/* Day / Date */}
+              <div style={{ marginBottom: "1rem" }}>
+                <label style={{ display: "block", fontSize: "0.84rem", fontWeight: 700, marginBottom: "0.35rem", color: "var(--color-text)" }}>
+                  Day / Interview Date *
+                </label>
+                <input
+                  type="date"
+                  required
+                  min={new Date().toISOString().slice(0, 10)}
+                  value={meetingDate}
+                  onChange={(e) => setMeetingDate(e.target.value)}
+                  disabled={savingSchedule}
+                  style={{
+                    width: "100%",
+                    padding: "0.65rem",
+                    borderRadius: "var(--radius-md)",
+                    border: "1px solid var(--color-border)",
+                    background: "var(--color-bg)",
+                    color: "var(--color-text)",
+                    fontSize: "0.85rem",
+                  }}
+                />
+              </div>
+
+              {/* Start Time & End Time */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.85rem", marginBottom: "1rem" }}>
+                <div>
+                  <label style={{ display: "block", fontSize: "0.84rem", fontWeight: 700, marginBottom: "0.35rem", color: "var(--color-text)" }}>
+                    Start Time *
+                  </label>
+                  <input
+                    type="time"
+                    required
+                    value={startTime}
+                    onChange={(e) => setStartTime(e.target.value)}
+                    disabled={savingSchedule}
+                    style={{
+                      width: "100%",
+                      padding: "0.65rem",
+                      borderRadius: "var(--radius-md)",
+                      border: "1px solid var(--color-border)",
+                      background: "var(--color-bg)",
+                      color: "var(--color-text)",
+                      fontSize: "0.85rem",
+                    }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: "block", fontSize: "0.84rem", fontWeight: 700, marginBottom: "0.35rem", color: "var(--color-text)" }}>
+                    End Time *
+                  </label>
+                  <input
+                    type="time"
+                    required
+                    value={endTime}
+                    onChange={(e) => setEndTime(e.target.value)}
+                    disabled={savingSchedule}
+                    style={{
+                      width: "100%",
+                      padding: "0.65rem",
+                      borderRadius: "var(--radius-md)",
+                      border: "1px solid var(--color-border)",
+                      background: "var(--color-bg)",
+                      color: "var(--color-text)",
+                      fontSize: "0.85rem",
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* Meeting Link */}
+              <div style={{ marginBottom: "1.5rem" }}>
+                <label style={{ display: "block", fontSize: "0.84rem", fontWeight: 700, marginBottom: "0.35rem", color: "var(--color-text)" }}>
+                  Meeting Link (WebRTC Studio or Zoom URL)
+                </label>
+                <input
+                  type="text"
+                  value={meetingLink}
+                  onChange={(e) => setMeetingLink(e.target.value)}
+                  disabled={savingSchedule}
+                  placeholder={`/interviews/session/${schedulingReq.id}`}
+                  style={{
+                    width: "100%",
+                    padding: "0.65rem",
+                    borderRadius: "var(--radius-md)",
+                    border: "1px solid var(--color-border)",
+                    background: "var(--color-bg)",
+                    color: "var(--color-text)",
+                    fontSize: "0.85rem",
+                  }}
+                />
+                <span style={{ fontSize: "0.74rem", color: "var(--color-muted)", marginTop: "0.25rem", display: "block" }}>
+                  Defaults to built-in WebRTC Live Studio or paste a custom Zoom / Google Meet room URL.
+                </span>
+              </div>
+
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem" }}>
+                <button
+                  type="button"
+                  onClick={() => setSchedulingReq(null)}
+                  disabled={savingSchedule}
+                  className="btn btn-outline"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingSchedule}
+                  className="btn btn-primary"
+                  style={{ display: "inline-flex", alignItems: "center", gap: "0.4rem" }}
+                >
+                  {savingSchedule ? <FiLoader className="spin-animation" /> : <FiCheckCircle />}
+                  {savingSchedule ? "Saving Slot..." : "Confirm & Send Link"}
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+      </div>
     </DashboardLayout>
   );
 };

@@ -20,6 +20,13 @@ import {
   FiBriefcase,
   FiCheckCircle,
   FiAlertCircle,
+  FiCamera,
+  FiActivity,
+  FiStar,
+  FiShield,
+  FiZap,
+  FiAward,
+  FiCheck,
 } from 'react-icons/fi';
 import { HiSparkles } from 'react-icons/hi';
 import DashboardLayout from '../../components/Dashboard/DashboardLayout';
@@ -29,9 +36,6 @@ import userService from '../../services/userService';
 import { supabase, isSupabaseConfigured } from '../../services/supabaseClient';
 import toast from 'react-hot-toast';
 import './studentProfile.css';
-
-const DEFAULT_AVATAR =
-  'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=400';
 
 const EMPTY_FORM = {
   fullName: '',
@@ -50,15 +54,11 @@ const EMPTY_FORM = {
 const normalizeUrl = (value) => {
   if (!value) return '';
   const trimmed = value.trim();
-
   if (
     trimmed.startsWith('http://') ||
     trimmed.startsWith('https://') ||
     trimmed.startsWith('mailto:')
-  ) {
-    return trimmed;
-  }
-
+  ) return trimmed;
   return `https://${trimmed}`;
 };
 
@@ -84,7 +84,6 @@ const getProfileCompletion = (formData, skills, resumeFileName) => {
     skills.length > 0,
     resumeFileName,
   ];
-
   const completed = fields.filter(Boolean).length;
   return Math.round((completed / fields.length) * 100);
 };
@@ -99,7 +98,7 @@ export const StudentProfile = () => {
   const [saving, setSaving] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [uploadingResume, setUploadingResume] = useState(false);
-  const [editMode, setEditMode] = useState(false);
+  const [activeTab, setActiveTab] = useState('Overview');
 
   const [formData, setFormData] = useState(getInitialFormData(user));
   const [skills, setSkills] = useState([]);
@@ -115,24 +114,15 @@ export const StudentProfile = () => {
   );
 
   useEffect(() => {
-    if (user?.id) {
-      fetchProfileData();
-    } else {
-      setLoading(false);
-    }
+    if (user?.id) fetchProfileData();
+    else setLoading(false);
   }, [user?.id]);
 
   const fetchProfileData = async () => {
-    if (!user?.id) {
-      setLoading(false);
-      return;
-    }
-
+    if (!user?.id) { setLoading(false); return; }
     setLoading(true);
-
     try {
       const data = await userService.getCandidateProfile(user.id);
-
       if (!data) {
         setProfileExists(false);
         setFormData(getInitialFormData(user));
@@ -142,9 +132,7 @@ export const StudentProfile = () => {
         setResumeFileUrl('');
         return;
       }
-
       setProfileExists(true);
-
       setFormData({
         fullName: data.name || '',
         username: data.username || '',
@@ -158,7 +146,6 @@ export const StudentProfile = () => {
         portfolioUrl: data.portfolio_url || '',
         website: data.website || '',
       });
-
       setSkills(Array.isArray(data.skills) ? data.skills : []);
       setPhotoPreview(data.avatar_url || data.avatar || '');
       setResumeFileName(data.resume_file_name || '');
@@ -173,160 +160,81 @@ export const StudentProfile = () => {
 
   const handleInputChange = (event) => {
     const { name, value } = event.target;
-
-    setFormData((previous) => ({
-      ...previous,
-      [name]: value,
-    }));
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleAddSkill = (event) => {
     event?.preventDefault();
-
     const skill = newSkillInput.trim();
-
     if (!skill) return;
-
-    const alreadyExists = skills.some(
-      (existingSkill) => existingSkill.toLowerCase() === skill.toLowerCase()
-    );
-
-    if (alreadyExists) {
-      toast.error('This skill has already been added');
-      return;
+    if (skills.some((s) => s.toLowerCase() === skill.toLowerCase())) {
+      toast.error('This skill has already been added'); return;
     }
-
-    setSkills((previous) => [...previous, skill]);
+    setSkills((prev) => [...prev, skill]);
     setNewSkillInput('');
   };
 
   const handleRemoveSkill = (skillToRemove) => {
-    setSkills((previous) =>
-      previous.filter((skill) => skill !== skillToRemove)
-    );
+    setSkills((prev) => prev.filter((s) => s !== skillToRemove));
   };
 
   const validateImage = (file) => {
     const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
-    const maxSize = 5 * 1024 * 1024;
-
-    if (!validTypes.includes(file.type)) {
-      toast.error('Please upload a JPG, PNG, or WEBP image');
-      return false;
-    }
-
-    if (file.size > maxSize) {
-      toast.error('Profile image must be smaller than 5MB');
-      return false;
-    }
-
+    if (!validTypes.includes(file.type)) { toast.error('Please upload a JPG, PNG, or WEBP image'); return false; }
+    if (file.size > 5 * 1024 * 1024) { toast.error('Profile image must be smaller than 5MB'); return false; }
     return true;
   };
 
   const validateResume = (file) => {
-    const validTypes = [
-      'application/pdf',
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    ];
-    const maxSize = 10 * 1024 * 1024;
-
+    const validTypes = ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
     const validExtension = /\.(pdf|docx)$/i.test(file.name);
-
-    if (!validTypes.includes(file.type) && !validExtension) {
-      toast.error('Please upload a PDF or DOCX resume');
-      return false;
-    }
-
-    if (file.size > maxSize) {
-      toast.error('Resume must be smaller than 10MB');
-      return false;
-    }
-
+    if (!validTypes.includes(file.type) && !validExtension) { toast.error('Please upload a PDF or DOCX resume'); return false; }
+    if (file.size > 10 * 1024 * 1024) { toast.error('Resume must be smaller than 10MB'); return false; }
     return true;
   };
 
   const uploadToStorage = async (bucket, file, prefix) => {
     const extension = file.name.split('.').pop()?.toLowerCase() || 'file';
     const filePath = `${user.id}/${prefix}-${Date.now()}.${extension}`;
-
-    const { error: uploadError } = await supabase.storage
-      .from(bucket)
-      .upload(filePath, file, {
-        upsert: true,
-        cacheControl: '3600',
-        contentType: file.type,
-      });
-
-    if (uploadError) {
-      throw uploadError;
-    }
-
-    const { data: publicUrlData } = supabase.storage
-      .from(bucket)
-      .getPublicUrl(filePath);
-
+    const { error: uploadError } = await supabase.storage.from(bucket).upload(filePath, file, {
+      upsert: true, cacheControl: '3600', contentType: file.type,
+    });
+    if (uploadError) throw uploadError;
+    const { data: publicUrlData } = supabase.storage.from(bucket).getPublicUrl(filePath);
     return publicUrlData?.publicUrl || '';
   };
 
   const handlePhotoUpload = async (event) => {
     const file = event.target.files?.[0];
-
-    if (!file) return;
-    if (!validateImage(file)) return;
-
+    if (!file || !validateImage(file)) return;
     const localPreview = URL.createObjectURL(file);
     setPhotoPreview(localPreview);
-
-    if (!isSupabaseConfigured() || !user?.id) {
-      toast.success('Photo preview updated');
-      return;
-    }
-
+    if (!isSupabaseConfigured() || !user?.id) { toast.success('Photo preview updated'); return; }
     setUploadingAvatar(true);
-
     try {
-      const uploadedUrl = await uploadToStorage(
-        'profile_images',
-        file,
-        'avatar'
-      );
-
+      const uploadedUrl = await uploadToStorage('profile_images', file, 'avatar');
       setPhotoPreview(uploadedUrl);
       toast.success('Profile photo uploaded');
     } catch (error) {
       console.error('Avatar upload failed:', error);
       toast.error('Photo upload failed. The preview is still available.');
-    } finally {
-      setUploadingAvatar(false);
-    }
+    } finally { setUploadingAvatar(false); }
   };
 
   const handleResumeUpload = async (event) => {
     const file = event.target.files?.[0];
-
-    if (!file) return;
-    if (!validateResume(file)) return;
-
+    if (!file || !validateResume(file)) return;
     setResumeFileName(file.name);
-
-    if (!isSupabaseConfigured() || !user?.id) {
-      toast.success('Resume selected');
-      return;
-    }
-
+    if (!isSupabaseConfigured() || !user?.id) { toast.success('Resume selected'); return; }
     setUploadingResume(true);
-
     try {
       const uploadedUrl = await uploadToStorage('resumes', file, 'resume');
-
       setResumeFileUrl(uploadedUrl);
       toast.success('Resume uploaded');
     } catch (error) {
       console.error('Resume upload failed:', error);
       toast.error('Resume upload failed. Please try again.');
-    } finally {
-      setUploadingResume(false);
-    }
+    } finally { setUploadingResume(false); }
   };
 
   const handleReset = async () => {
@@ -336,24 +244,10 @@ export const StudentProfile = () => {
 
   const handleSubmit = async (event) => {
     event.preventDefault();
-
-    if (!user?.id) {
-      toast.error('You must be logged in to save your profile');
-      return;
-    }
-
-    if (!formData.fullName.trim()) {
-      toast.error('Full name is required');
-      return;
-    }
-
-    if (!formData.email.trim()) {
-      toast.error('Email address is required');
-      return;
-    }
-
+    if (!user?.id) { toast.error('You must be logged in to save your profile'); return; }
+    if (!formData.fullName.trim()) { toast.error('Full name is required'); return; }
+    if (!formData.email.trim()) { toast.error('Email address is required'); return; }
     setSaving(true);
-
     try {
       const payload = {
         name: formData.fullName.trim(),
@@ -374,74 +268,41 @@ export const StudentProfile = () => {
         skills,
         role: 'student',
       };
-
-      const result = await userService.updateCandidateProfile(
-        user.id,
-        payload
-      );
-
+      const result = await userService.updateCandidateProfile(user.id, payload);
       const savedProfile = result?.data || result || payload;
-
       setFormData({
         fullName: savedProfile.name || payload.name || '',
         username: savedProfile.username || payload.username || '',
         email: savedProfile.email || payload.email || '',
         phone: savedProfile.phone || payload.phone || '',
         location: savedProfile.location || payload.location || '',
-        currentStatus:
-          savedProfile.current_status || payload.current_status || '',
+        currentStatus: savedProfile.current_status || payload.current_status || '',
         bio: savedProfile.bio || payload.bio || '',
         githubUrl: savedProfile.github_url || payload.github_url || '',
-        linkedinUrl:
-          savedProfile.linkedin_url || payload.linkedin_url || '',
-        portfolioUrl:
-          savedProfile.portfolio_url || payload.portfolio_url || '',
+        linkedinUrl: savedProfile.linkedin_url || payload.linkedin_url || '',
+        portfolioUrl: savedProfile.portfolio_url || payload.portfolio_url || '',
         website: savedProfile.website || payload.website || '',
       });
-
-      setSkills(
-        Array.isArray(savedProfile.skills)
-          ? savedProfile.skills
-          : payload.skills
-      );
-      setPhotoPreview(
-        savedProfile.avatar_url || payload.avatar_url || ''
-      );
-      setResumeFileName(
-        savedProfile.resume_file_name || payload.resume_file_name || ''
-      );
-      setResumeFileUrl(
-        savedProfile.resume_file_url || payload.resume_file_url || ''
-      );
+      setSkills(Array.isArray(savedProfile.skills) ? savedProfile.skills : payload.skills);
+      setPhotoPreview(savedProfile.avatar_url || payload.avatar_url || '');
+      setResumeFileName(savedProfile.resume_file_name || payload.resume_file_name || '');
+      setResumeFileUrl(savedProfile.resume_file_url || payload.resume_file_url || '');
       setProfileExists(true);
-
-      if (updateUser) {
-        updateUser({
-          ...user,
-          name: payload.name,
-          username: payload.username,
-          email: payload.email,
-          avatar: payload.avatar_url,
-          avatar_url: payload.avatar_url,
-        });
-      }
-
-      setEditMode(false);
+      if (updateUser) updateUser({ ...user, name: payload.name, username: payload.username, email: payload.email, avatar: payload.avatar_url, avatar_url: payload.avatar_url });
+      setActiveTab('Overview');
       toast.success('Profile saved successfully');
     } catch (error) {
       console.error('Profile update failed:', error);
       toast.error(error?.message || 'Failed to save profile');
-    } finally {
-      setSaving(false);
-    }
+    } finally { setSaving(false); }
   };
 
   if (loading) {
     return (
       <DashboardLayout title="My Profile">
-        <div className="profile-loading">
-          <FiLoader className="spin-animation" />
-          <p>Loading profile...</p>
+        <div className="sp-loading">
+          <div className="sp-loading-spinner"><FiLoader /></div>
+          <p>Loading your profile...</p>
         </div>
       </DashboardLayout>
     );
@@ -450,7 +311,7 @@ export const StudentProfile = () => {
   if (!user?.id) {
     return (
       <DashboardLayout title="My Profile">
-        <div className="profile-empty-state">
+        <div className="sp-empty-state">
           <FiAlertCircle />
           <h2>Authentication required</h2>
           <p>Please sign in to view and edit your profile.</p>
@@ -459,593 +320,581 @@ export const StudentProfile = () => {
     );
   }
 
+  const completionColor = profileCompletion >= 80 ? '#059669' : profileCompletion >= 50 ? '#d97706' : '#dc2626';
+
   return (
     <DashboardLayout title="My Profile">
-      <main className="student-profile-page">
-        <section className="profile-hero-card">
-          <div className="profile-hero-background">
-            <div className="hero-orb hero-orb-one" />
-            <div className="hero-orb hero-orb-two" />
-            <HiSparkles className="hero-sparkle" />
+      <div className="sp-root">
+
+        {/* ── HERO BANNER ── */}
+        <div className="sp-banner">
+          <div className="sp-banner-bg">
+            <div className="sp-banner-orb sp-banner-orb-a" />
+            <div className="sp-banner-orb sp-banner-orb-b" />
+            <div className="sp-banner-orb sp-banner-orb-c" />
+            <HiSparkles className="sp-banner-sparkle" />
           </div>
-
-          <div className="profile-hero-content">
-            <div className="profile-identity">
-              <div className="profile-avatar-container">
-                {photoPreview ? (
-                  <img
-                    src={photoPreview}
-                    alt={formData.fullName || 'Profile'}
-                    className="profile-avatar"
-                  />
-                ) : (
-                  <div className="profile-avatar-placeholder">
-                    <FiUser />
-                  </div>
-                )}
-
-                {uploadingAvatar && (
-                  <div className="avatar-uploading">
-                    <FiLoader className="spin-animation" />
-                  </div>
-                )}
-              </div>
-
-              <div className="profile-heading">
-                <div className="profile-name-row">
-                  <h1>{formData.fullName || 'Unnamed profile'}</h1>
-                  <MembershipBadge />
-                </div>
-
-                <p className="profile-username">
-                  {formData.username ? `@${formData.username}` : 'Username not set'}
-                </p>
-
-                <div className="profile-status-row">
-                  <span className="status-pill">
-                    <FiCheckCircle />
-                    {formData.currentStatus || 'Status not set'}
-                  </span>
-
-                  {formData.location && (
-                    <span className="location-text">
-                      <FiMapPin />
-                      {formData.location}
-                    </span>
-                  )}
-                </div>
-              </div>
+          <div className="sp-avatar-wrap">
+            <div className="sp-avatar-ring">
+              {photoPreview ? (
+                <img src={photoPreview} alt={formData.fullName || 'Avatar'} className="sp-avatar-img" />
+              ) : (
+                <div className="sp-avatar-fallback"><FiUser /></div>
+              )}
+              {uploadingAvatar && <div className="sp-avatar-overlay"><FiLoader className="sp-spin" /></div>}
             </div>
-
             <button
-              type="button"
-              className="profile-edit-button"
-              onClick={() => setEditMode((previous) => !previous)}
+              type="button" className="sp-avatar-cam"
+              onClick={() => { setActiveTab('Edit Profile'); setTimeout(() => photoInputRef.current?.click(), 200); }}
+              title="Change photo"
             >
-              <FiEdit3 />
-              {editMode ? 'Close editor' : 'Edit profile'}
+              <FiCamera />
             </button>
           </div>
-
-          <div className="profile-hero-footer">
-            <div className="profile-stat">
-              <strong>{skills.length}</strong>
-              <span>Skills</span>
+          <div className="sp-banner-identity">
+            <div className="sp-name-row">
+              <h1 className="sp-name">{formData.fullName || 'Unnamed Student'}</h1>
+             
             </div>
-
-            <div className="profile-stat">
-              <strong>{resumeFileName ? '1' : '0'}</strong>
-              <span>Resume</span>
-            </div>
-
-            <div className="profile-stat">
-              <strong>{profileCompletion}%</strong>
-              <span>Complete</span>
-            </div>
-
-            <div className="profile-progress">
-              <div className="progress-label">
-                <span>Profile completion</span>
-                <strong>{profileCompletion}%</strong>
-              </div>
-              <div className="progress-track">
-                <div
-                  className="progress-value"
-                  style={{ width: `${profileCompletion}%` }}
-                />
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section className="profile-content-grid">
-          <div className="profile-card summary-card">
-            <div className="card-heading">
-              <div className="heading-icon">
-                <FiUser />
-              </div>
-              <div>
-                <h2>About me</h2>
-                <p>Professional profile summary</p>
-              </div>
-            </div>
-
-            <p className="profile-bio">
-              {formData.bio || 'No professional bio added yet.'}
-            </p>
-
-            <div className="skills-section">
-              <div className="section-label">
-                <FiTag />
-                Skills and technologies
-              </div>
-
-              {skills.length > 0 ? (
-                <div className="skills-list">
-                  {skills.map((skill) => (
-                    <span className="display-skill" key={skill}>
-                      {skill}
-                    </span>
-                  ))}
-                </div>
+            {formData.username && <p className="sp-handle">@{formData.username}</p>}
+            <div className="sp-banner-meta">
+              {formData.currentStatus ? (
+                <span className="sp-status-pill"><FiCheckCircle />{formData.currentStatus}</span>
               ) : (
-                <p className="muted-text">No skills added yet.</p>
+                <span className="sp-status-pill sp-status-default"><FiUser /> Candidate</span>
+              )}
+              {formData.location ? (
+                <span className="sp-location"><FiMapPin />{formData.location}</span>
+              ) : (
+                <span className="sp-location sp-location-empty"><FiMapPin /> Location not set</span>
               )}
             </div>
           </div>
-
-          <div className="profile-card contact-card">
-            <div className="card-heading">
-              <div className="heading-icon">
-                <FiBriefcase />
-              </div>
-              <div>
-                <h2>Contact and links</h2>
-                <p>Information saved in your profile</p>
-              </div>
+          <div className="sp-completion-ring-wrap">
+            <svg className="sp-ring-svg" viewBox="0 0 80 80">
+              <circle cx="40" cy="40" r="34" fill="none" stroke="var(--color-border, #d1e0d9)" strokeWidth="6" />
+              <circle
+                cx="40" cy="40" r="34" fill="none"
+                stroke={completionColor} strokeWidth="6"
+                strokeDasharray={`${2 * Math.PI * 34}`}
+                strokeDashoffset={`${2 * Math.PI * 34 * (1 - profileCompletion / 100)}`}
+                strokeLinecap="round" transform="rotate(-90 40 40)"
+              />
+            </svg>
+            <div className="sp-ring-label">
+              <strong style={{ color: completionColor }}>{profileCompletion}%</strong>
+              <span>complete</span>
             </div>
-
-            <div className="contact-list">
-              {formData.email && (
-                <a
-                  href={`mailto:${formData.email}`}
-                  className="contact-item"
-                >
-                  <FiMail />
-                  <span>{formData.email}</span>
-                </a>
-              )}
-
-              {formData.phone && (
-                <a href={`tel:${formData.phone}`} className="contact-item">
-                  <FiPhone />
-                  <span>{formData.phone}</span>
-                </a>
-              )}
-
-              {formData.githubUrl && (
-                <a
-                  href={normalizeUrl(formData.githubUrl)}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="contact-item"
-                >
-                  <FiGithub />
-                  <span>GitHub</span>
-                  <FiExternalLink className="link-arrow" />
-                </a>
-              )}
-
-              {formData.linkedinUrl && (
-                <a
-                  href={normalizeUrl(formData.linkedinUrl)}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="contact-item"
-                >
-                  <FiLinkedin />
-                  <span>LinkedIn</span>
-                  <FiExternalLink className="link-arrow" />
-                </a>
-              )}
-
-              {formData.portfolioUrl && (
-                <a
-                  href={normalizeUrl(formData.portfolioUrl)}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="contact-item"
-                >
-                  <FiGlobe />
-                  <span>Portfolio</span>
-                  <FiExternalLink className="link-arrow" />
-                </a>
-              )}
-
-              {formData.website && (
-                <a
-                  href={normalizeUrl(formData.website)}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="contact-item"
-                >
-                  <FiGlobe />
-                  <span>Website</span>
-                  <FiExternalLink className="link-arrow" />
-                </a>
-              )}
-
-              {!formData.email &&
-                !formData.phone &&
-                !formData.githubUrl &&
-                !formData.linkedinUrl &&
-                !formData.portfolioUrl &&
-                !formData.website && (
-                  <p className="muted-text">
-                    No contact information added yet.
-                  </p>
-                )}
-            </div>
-
-            {resumeFileName && (
-              <a
-                href={resumeFileUrl || '#'}
-                target={resumeFileUrl ? '_blank' : undefined}
-                rel={resumeFileUrl ? 'noreferrer' : undefined}
-                className={`resume-display ${
-                  !resumeFileUrl ? 'disabled-link' : ''
-                }`}
-              >
-                <FiFileText />
-                <span>
-                  <strong>{resumeFileName}</strong>
-                  <small>
-                    {resumeFileUrl
-                      ? 'Open uploaded resume'
-                      : 'Resume URL unavailable'}
-                  </small>
-                </span>
-                <FiExternalLink />
-              </a>
-            )}
           </div>
-        </section>
+        </div>
 
-        {editMode && (
-          <section className="profile-editor-card">
-            <div className="editor-header">
-              <div>
-                <h2>Edit profile details</h2>
-                <p>Update your information and save it to your profile.</p>
+        {/* ── QUICK STATS BAR ── */}
+        {/* <div className="sp-stats-bar">
+          <div className="sp-stat-item">
+            <div className="sp-stat-icon"><FiZap /></div>
+            <div><strong>{skills.length}</strong><span>Skills Listed</span></div>
+          </div>
+          <div className="sp-stat-divider" />
+          <div className="sp-stat-item">
+            <div className="sp-stat-icon"><FiFileText /></div>
+            <div><strong>{resumeFileName ? 'Attached' : 'Missing'}</strong><span>Resume Doc</span></div>
+          </div>
+          <div className="sp-stat-divider" />
+          <div className="sp-stat-item">
+            <div className="sp-stat-icon"><FiActivity /></div>
+            <div><strong>{profileExists ? 'Active' : 'Draft'}</strong><span>Profile Status</span></div>
+          </div>
+          <div className="sp-stat-divider" />
+          <div className="sp-stat-item sp-stat-progress">
+            <div className="sp-progress-bar-wrap">
+              <div className="sp-progress-bar-label">
+                <span>Profile Readiness</span>
+                <strong style={{ color: completionColor }}>{profileCompletion}%</strong>
               </div>
-
-              <span className="sync-badge">
-                <span />
-                Supabase profile sync
-              </span>
+              <div className="sp-progress-track">
+                <div className="sp-progress-fill" style={{ width: `${profileCompletion}%`, background: completionColor }} />
+              </div>
             </div>
+          </div>
+          <button type="button" className="sp-edit-btn" onClick={() => setActiveTab(activeTab === 'Edit Profile' ? 'Overview' : 'Edit Profile')}>
+            <FiEdit3 />
+            {activeTab === 'Edit Profile' ? 'View Overview' : 'Edit Profile'}
+          </button>
+        </div> */}
 
-            <form className="profile-form" onSubmit={handleSubmit}>
-              <div className="upload-grid">
-                <div className="upload-card">
-                  <div className="upload-icon">
-                    <FiUploadCloud />
+        {/* ── TABS NAVIGATION ── */}
+        <div className="sp-tabs-nav">
+          <button
+            type="button"
+            className={`sp-tab-btn ${activeTab === 'Overview' ? 'active' : ''}`}
+            onClick={() => setActiveTab('Overview')}
+          >
+            <FiUser className="sp-tab-btn-icon" /> Overview
+          </button>
+          <button
+            type="button"
+            className={`sp-tab-btn ${activeTab === 'Edit Profile' ? 'active' : ''}`}
+            onClick={() => setActiveTab('Edit Profile')}
+          >
+            <FiEdit3 className="sp-tab-btn-icon" /> Edit Profile
+          </button>
+        </div>
+
+        {/* ── OVERVIEW TAB ── */}
+        {activeTab === 'Overview' && (
+          <div className="sp-overview-container">
+            {/* Top 2-Column Grid */}
+            <div className="sp-overview-grid">
+              <div className="sp-col-main">
+
+                {/* 1. Professional Bio / About Me */}
+                <div className="sp-card sp-overview-card">
+                  <div className="sp-card-head">
+                    <div className="sp-card-icon"><FiUser /></div>
+                    <div className="sp-card-head-info">
+                      <h2>About Me &amp; Summary</h2>
+                      <p>Candidate background and career focus</p>
+                    </div>
+                    {formData.currentStatus && (
+                      <span className="sp-head-badge">
+                        <FiCheckCircle /> {formData.currentStatus}
+                      </span>
+                    )}
                   </div>
-                  <div>
-                    <h3>Profile photo</h3>
-                    <p>JPG, PNG, or WEBP. Maximum 5MB.</p>
+
+                  <div className="sp-bio-box">
+                    {formData.bio ? (
+                      <p className="sp-bio-text">{formData.bio}</p>
+                    ) : (
+                      <div className="sp-overview-empty">
+                        <FiFileText size={22} className="sp-empty-icon" />
+                        <p>No professional bio written yet.</p>
+                        <span>Share your background and career goals with recruiters.</span>
+                        <button
+                          type="button"
+                          className="sp-btn-inline-action"
+                          onClick={() => setActiveTab('Edit Profile')}
+                        >
+                          <FiPlus /> Add Bio
+                        </button>
+                      </div>
+                    )}
                   </div>
-                  <button
-                    type="button"
-                    className="upload-button"
-                    onClick={() => photoInputRef.current?.click()}
-                    disabled={uploadingAvatar}
-                  >
-                    {uploadingAvatar ? 'Uploading...' : 'Choose photo'}
-                  </button>
-                  <input
-                    ref={photoInputRef}
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp"
-                    onChange={handlePhotoUpload}
-                    hidden
-                  />
                 </div>
 
-                <div className="upload-card">
-                  <div className="upload-icon resume-icon">
-                    <FiFileText />
+                {/* 2. Skills & Technologies */}
+                <div className="sp-card sp-overview-card">
+                  <div className="sp-card-head">
+                    <div className="sp-card-icon sp-card-icon-teal"><FiTag /></div>
+                    <div className="sp-card-head-info">
+                      <h2>Technical Skills &amp; Stack</h2>
+                      <p>{skills.length} verified skill{skills.length !== 1 ? 's' : ''} listed</p>
+                    </div>
+                    <button
+                      type="button"
+                      className="sp-head-action-btn"
+                      onClick={() => setActiveTab('Edit Profile')}
+                    >
+                      <FiPlus /> Manage
+                    </button>
                   </div>
-                  <div>
-                    <h3>Primary resume</h3>
-                    <p>PDF or DOCX. Maximum 10MB.</p>
-                  </div>
-                  <button
-                    type="button"
-                    className="upload-button"
-                    onClick={() => resumeInputRef.current?.click()}
-                    disabled={uploadingResume}
-                  >
-                    {uploadingResume ? 'Uploading...' : 'Choose resume'}
-                  </button>
-                  <input
-                    ref={resumeInputRef}
-                    type="file"
-                    accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                    onChange={handleResumeUpload}
-                    hidden
-                  />
-                  {resumeFileName && (
-                    <span className="selected-file">{resumeFileName}</span>
+
+                  {skills.length > 0 ? (
+                    <div className="sp-skill-cloud">
+                      {skills.map((skill) => (
+                        <span key={skill} className="sp-skill-tag">
+                          <FiZap className="sp-skill-icon" /> {skill}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="sp-overview-empty">
+                      <FiTag size={22} className="sp-empty-icon" />
+                      <p>No skills added to your profile yet.</p>
+                      <span>Highlight your top tools, languages, and frameworks.</span>
+                      <button
+                        type="button"
+                        className="sp-btn-inline-action"
+                        onClick={() => setActiveTab('Edit Profile')}
+                      >
+                        <FiPlus /> Add Skills
+                      </button>
+                    </div>
                   )}
                 </div>
-              </div>
 
-              <div className="form-section">
-                <div className="form-section-heading">
-                  <h3>Basic information</h3>
-                  <p>Keep your personal information accurate.</p>
+                {/* 3. Resume & Uploaded Documents */}
+                <div className="sp-card sp-overview-card">
+                  <div className="sp-card-head">
+                    <div className="sp-card-icon sp-card-icon-emerald"><FiFileText /></div>
+                    <div className="sp-card-head-info">
+                      <h2>Resume &amp; Application Documents</h2>
+                      <p>Official resume available for recruiter technical screening</p>
+                    </div>
+                  </div>
+
+                  {resumeFileName ? (
+                    <div className="sp-resume-highlight">
+                      <div className="sp-resume-doc-badge">
+                        <FiFileText size={24} />
+                      </div>
+                      <div className="sp-resume-doc-meta">
+                        <strong>{resumeFileName}</strong>
+                        <span className="sp-resume-status-tag">
+                          <FiCheckCircle /> Ready for screening &amp; ATS evaluation
+                        </span>
+                      </div>
+                      <div className="sp-resume-actions">
+                        {resumeFileUrl && (
+                          <a
+                            href={resumeFileUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="sp-resume-btn sp-resume-btn-primary"
+                          >
+                            <FiExternalLink /> Open Resume
+                          </a>
+                        )}
+                        <button
+                          type="button"
+                          className="sp-resume-btn sp-resume-btn-secondary"
+                          onClick={() => { setActiveTab('Edit Profile'); setTimeout(() => resumeInputRef.current?.click(), 200); }}
+                        >
+                          <FiUploadCloud /> Replace
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="sp-overview-empty">
+                      <FiUploadCloud size={22} className="sp-empty-icon" />
+                      <p>No resume document attached.</p>
+                      <span>Upload your PDF or DOCX resume to get ATS matched with top recruiters.</span>
+                      <button
+                        type="button"
+                        className="sp-btn-inline-action"
+                        onClick={() => { setActiveTab('Edit Profile'); setTimeout(() => resumeInputRef.current?.click(), 200); }}
+                      >
+                        <FiUploadCloud /> Upload Resume
+                      </button>
+                    </div>
+                  )}
                 </div>
 
-                <div className="form-grid">
-                  <FormField
-                    label="Full name"
-                    name="fullName"
-                    value={formData.fullName}
-                    onChange={handleInputChange}
-                    placeholder="Your full name"
-                    icon={<FiUser />}
-                    required
-                  />
+              </div>
 
-                  <FormField
-                    label="Username"
-                    name="username"
-                    value={formData.username}
-                    onChange={handleInputChange}
-                    placeholder="your_username"
-                    icon={<FiUser />}
-                  />
+              <div className="sp-col-side">
 
-                  <FormField
-                    label="Email address"
-                    name="email"
-                    type="email"
-                    value={formData.email}
-                    onChange={handleInputChange}
-                    placeholder="you@example.com"
-                    icon={<FiMail />}
-                    required
-                  />
+                {/* 4. Direct Contact Information */}
+                <div className="sp-card sp-overview-card">
+                  <div className="sp-card-head">
+                    <div className="sp-card-icon sp-card-icon-blue"><FiBriefcase /></div>
+                    <div className="sp-card-head-info">
+                      <h2>Contact Details</h2>
+                      <p>Direct contact info</p>
+                    </div>
+                  </div>
 
-                  <FormField
-                    label="Phone number"
-                    name="phone"
-                    type="tel"
-                    value={formData.phone}
-                    onChange={handleInputChange}
-                    placeholder="+91 98765 43210"
-                    icon={<FiPhone />}
-                  />
+                  <div className="sp-contact-list">
+                    <div className="sp-contact-row">
+                      <div className="sp-contact-dot sp-dot-mail"><FiMail /></div>
+                      <div className="sp-contact-text">
+                        <strong>Email Address</strong>
+                        <span>{formData.email || 'Not provided'}</span>
+                      </div>
+                    </div>
 
-                  <FormField
-                    label="Location"
-                    name="location"
-                    value={formData.location}
-                    onChange={handleInputChange}
-                    placeholder="Hyderabad, Telangana"
-                    icon={<FiMapPin />}
-                  />
+                    <div className="sp-contact-row">
+                      <div className="sp-contact-dot sp-dot-phone"><FiPhone /></div>
+                      <div className="sp-contact-text">
+                        <strong>Phone Number</strong>
+                        <span>{formData.phone || 'Not provided'}</span>
+                      </div>
+                    </div>
 
-                  <div className="field-group">
-                    <label htmlFor="currentStatus">Current status</label>
-                    <div className="input-wrapper">
-                      <FiBriefcase />
-                      <select
-                        id="currentStatus"
-                        name="currentStatus"
-                        value={formData.currentStatus}
-                        onChange={handleInputChange}
+                    <div className="sp-contact-row">
+                      <div className="sp-contact-dot sp-dot-loc"><FiMapPin /></div>
+                      <div className="sp-contact-text">
+                        <strong>Location</strong>
+                        <span>{formData.location || 'Not provided'}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 5. Online Presence & Portfolios */}
+                <div className="sp-card sp-overview-card">
+                  <div className="sp-card-head">
+                    <div className="sp-card-icon sp-card-icon-purple"><FiGlobe /></div>
+                    <div className="sp-card-head-info">
+                      <h2>Online Presence</h2>
+                      <p>Socials &amp; portfolios</p>
+                    </div>
+                  </div>
+
+                  <div className="sp-links-list">
+                    {formData.githubUrl ? (
+                      <a
+                        href={normalizeUrl(formData.githubUrl)}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="sp-link-row sp-link-active"
                       >
+                        <div className="sp-link-left">
+                          <FiGithub className="sp-link-icon" />
+                          <span>GitHub Profile</span>
+                        </div>
+                        <FiExternalLink className="sp-link-arrow" />
+                      </a>
+                    ) : (
+                      <div className="sp-link-row sp-link-inactive">
+                        <div className="sp-link-left">
+                          <FiGithub className="sp-link-icon" />
+                          <span>GitHub</span>
+                        </div>
+                        <span className="sp-link-missing">Not linked</span>
+                      </div>
+                    )}
+
+                    {formData.linkedinUrl ? (
+                      <a
+                        href={normalizeUrl(formData.linkedinUrl)}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="sp-link-row sp-link-active"
+                      >
+                        <div className="sp-link-left">
+                          <FiLinkedin className="sp-link-icon" />
+                          <span>LinkedIn Profile</span>
+                        </div>
+                        <FiExternalLink className="sp-link-arrow" />
+                      </a>
+                    ) : (
+                      <div className="sp-link-row sp-link-inactive">
+                        <div className="sp-link-left">
+                          <FiLinkedin className="sp-link-icon" />
+                          <span>LinkedIn</span>
+                        </div>
+                        <span className="sp-link-missing">Not linked</span>
+                      </div>
+                    )}
+
+                    {formData.portfolioUrl ? (
+                      <a
+                        href={normalizeUrl(formData.portfolioUrl)}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="sp-link-row sp-link-active"
+                      >
+                        <div className="sp-link-left">
+                          <FiStar className="sp-link-icon" />
+                          <span>Portfolio Website</span>
+                        </div>
+                        <FiExternalLink className="sp-link-arrow" />
+                      </a>
+                    ) : (
+                      <div className="sp-link-row sp-link-inactive">
+                        <div className="sp-link-left">
+                          <FiStar className="sp-link-icon" />
+                          <span>Portfolio</span>
+                        </div>
+                        <span className="sp-link-missing">Not linked</span>
+                      </div>
+                    )}
+
+                    {formData.website ? (
+                      <a
+                        href={normalizeUrl(formData.website)}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="sp-link-row sp-link-active"
+                      >
+                        <div className="sp-link-left">
+                          <FiGlobe className="sp-link-icon" />
+                          <span>Personal Website</span>
+                        </div>
+                        <FiExternalLink className="sp-link-arrow" />
+                      </a>
+                    ) : (
+                      <div className="sp-link-row sp-link-inactive">
+                        <div className="sp-link-left">
+                          <FiGlobe className="sp-link-icon" />
+                          <span>Website</span>
+                        </div>
+                        <span className="sp-link-missing">Not linked</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+              </div>
+            </div>
+
+            {/* 6. Profile Strength & Verification (100% FULL WIDTH CARD) */}
+            <div className="sp-card sp-strength-fullwidth">
+              <div className="sp-card-head">
+                <div className="sp-card-icon sp-card-icon-gold"><FiShield /></div>
+                <div className="sp-card-head-info">
+                  <h2>Profile Strength &amp; Verification Milestones</h2>
+                  <p>Complete your profile milestones to maximize recruiter visibility and interview invites</p>
+                </div>
+                <div className="sp-strength-score-pill" style={{ color: completionColor, borderColor: completionColor }}>
+                  <FiAward /> <strong>{profileCompletion}%</strong> {profileCompletion >= 80 ? 'Excellent' : profileCompletion >= 50 ? 'Moderate' : 'Incomplete'}
+                </div>
+              </div>
+
+              <div className="sp-checklist-grid">
+                {[
+                  { label: 'Full Name', done: Boolean(formData.fullName) },
+                  { label: 'Email Address', done: Boolean(formData.email) },
+                  { label: 'Phone Number', done: Boolean(formData.phone) },
+                  { label: 'Location', done: Boolean(formData.location) },
+                  { label: 'Current Status', done: Boolean(formData.currentStatus) },
+                  { label: 'Professional Bio', done: Boolean(formData.bio) },
+                  { label: 'Skills Listed', done: skills.length > 0 },
+                  { label: 'Resume Uploaded', done: Boolean(resumeFileName) },
+                  { label: 'GitHub Profile', done: Boolean(formData.githubUrl) },
+                  { label: 'LinkedIn Profile', done: Boolean(formData.linkedinUrl) },
+                  { label: 'Portfolio Link', done: Boolean(formData.portfolioUrl) },
+                  { label: 'Personal Site', done: Boolean(formData.website) },
+                ].map(({ label, done }) => (
+                  <div key={label} className={`sp-check-grid-item ${done ? 'sp-check-grid-done' : 'sp-check-grid-pending'}`}>
+                    <div className="sp-check-grid-icon">
+                      {done ? <FiCheckCircle /> : <FiAlertCircle />}
+                    </div>
+                    <div className="sp-check-grid-info">
+                      <strong>{label}</strong>
+                      <span>{done ? 'Completed' : 'Action Needed'}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+          </div>
+        )}
+
+        {/* ── EDIT PROFILE TAB ── */}
+        {activeTab === 'Edit Profile' && (
+          <div className="sp-editor-wrap">
+            <form className="sp-editor-form" onSubmit={handleSubmit}>
+              <div className="sp-editor-section">
+                <div className="sp-editor-section-head"><FiUploadCloud /><h3>Media &amp; Documents</h3></div>
+                <div className="sp-upload-grid">
+                  <div className="sp-upload-card">
+                    <div className="sp-upload-preview">
+                      {photoPreview ? <img src={photoPreview} alt="Avatar" /> : <FiUser />}
+                      {uploadingAvatar && <div className="sp-upload-overlay"><FiLoader className="sp-spin" /></div>}
+                    </div>
+                    <div className="sp-upload-info">
+                      <strong>Profile Photo</strong><span>JPG, PNG, WEBP · Max 5MB</span>
+                    </div>
+                    <button type="button" className="sp-upload-btn" onClick={() => photoInputRef.current?.click()} disabled={uploadingAvatar}>
+                      {uploadingAvatar ? 'Uploading…' : 'Choose Photo'}
+                    </button>
+                    <input ref={photoInputRef} type="file" accept="image/jpeg,image/png,image/webp" onChange={handlePhotoUpload} hidden />
+                  </div>
+                  <div className="sp-upload-card sp-upload-card-alt">
+                    <div className="sp-upload-preview sp-upload-preview-doc"><FiFileText />
+                      {uploadingResume && <div className="sp-upload-overlay"><FiLoader className="sp-spin" /></div>}
+                    </div>
+                    <div className="sp-upload-info">
+                      <strong>Resume</strong><span>PDF or DOCX · Max 10MB</span>
+                      {resumeFileName && <em>{resumeFileName}</em>}
+                    </div>
+                    <button type="button" className="sp-upload-btn sp-upload-btn-alt" onClick={() => resumeInputRef.current?.click()} disabled={uploadingResume}>
+                      {uploadingResume ? 'Uploading…' : 'Choose Resume'}
+                    </button>
+                    <input ref={resumeInputRef} type="file" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onChange={handleResumeUpload} hidden />
+                  </div>
+                </div>
+              </div>
+              <div className="sp-editor-section">
+                <div className="sp-editor-section-head"><FiUser /><h3>Basic Information</h3></div>
+                <div className="sp-form-grid">
+                  <FormField label="Full Name" name="fullName" value={formData.fullName} onChange={handleInputChange} placeholder="Your full name" icon={<FiUser />} required />
+                  <FormField label="Username" name="username" value={formData.username} onChange={handleInputChange} placeholder="your_username" icon={<FiUser />} />
+                  <FormField label="Email Address" name="email" type="email" value={formData.email} onChange={handleInputChange} placeholder="you@example.com" icon={<FiMail />} required />
+                  <FormField label="Phone Number" name="phone" type="tel" value={formData.phone} onChange={handleInputChange} placeholder="+91 98765 43210" icon={<FiPhone />} />
+                  <FormField label="Location" name="location" value={formData.location} onChange={handleInputChange} placeholder="Hyderabad, Telangana" icon={<FiMapPin />} />
+                  <div className="sp-field">
+                    <label htmlFor="currentStatus">Current Status</label>
+                    <div className="sp-input-wrap">
+                      <FiBriefcase />
+                      <select id="currentStatus" name="currentStatus" value={formData.currentStatus} onChange={handleInputChange}>
                         <option value="">Select status</option>
                         <option value="Student">Student</option>
                         <option value="Job Seeker">Job Seeker</option>
-                        <option value="Working Professional">
-                          Working Professional
-                        </option>
+                        <option value="Working Professional">Working Professional</option>
                       </select>
                     </div>
                   </div>
                 </div>
               </div>
-
-              <div className="form-section">
-                <div className="form-section-heading">
-                  <h3>Skills and technologies</h3>
-                  <p>Add technologies that represent your experience.</p>
-                </div>
-
-                <div className="skill-input-row">
-                  <div className="input-wrapper">
+              <div className="sp-editor-section">
+                <div className="sp-editor-section-head"><FiTag /><h3>Skills &amp; Technologies</h3></div>
+                <div className="sp-skill-input-row">
+                  <div className="sp-input-wrap sp-skill-input">
                     <FiTag />
                     <input
-                      type="text"
-                      value={newSkillInput}
-                      onChange={(event) =>
-                        setNewSkillInput(event.target.value)
-                      }
-                      onKeyDown={(event) => {
-                        if (event.key === 'Enter') {
-                          handleAddSkill(event);
-                        }
-                      }}
-                      placeholder="React, Python, PostgreSQL"
+                      type="text" value={newSkillInput}
+                      onChange={(e) => setNewSkillInput(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') handleAddSkill(e); }}
+                      placeholder="React, Python, PostgreSQL…"
                     />
                   </div>
-
-                  <button
-                    type="button"
-                    className="add-skill-button"
-                    onClick={handleAddSkill}
-                  >
-                    <FiPlus />
-                    Add skill
-                  </button>
+                  <button type="button" className="sp-add-skill-btn" onClick={handleAddSkill}><FiPlus /> Add</button>
                 </div>
-
-                <div className="editable-skills">
-                  {skills.length > 0 ? (
-                    skills.map((skill) => (
-                      <span className="editable-skill" key={skill}>
-                        {skill}
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveSkill(skill)}
-                          aria-label={`Remove ${skill}`}
-                        >
-                          <FiX />
-                        </button>
-                      </span>
-                    ))
-                  ) : (
-                    <p className="muted-text">No skills added yet.</p>
-                  )}
+                <div className="sp-editable-skills">
+                  {skills.length > 0 ? skills.map((skill) => (
+                    <span key={skill} className="sp-editable-tag">
+                      {skill}
+                      <button type="button" onClick={() => handleRemoveSkill(skill)} aria-label={`Remove ${skill}`}><FiX /></button>
+                    </span>
+                  )) : <p className="sp-hint">No skills added yet.</p>}
                 </div>
               </div>
-
-              <div className="form-section">
-                <div className="form-section-heading bio-heading">
-                  <div>
-                    <h3>Professional bio</h3>
-                    <p>Introduce yourself in up to 500 characters.</p>
-                  </div>
-                  <span>{formData.bio.length}/500</span>
+              <div className="sp-editor-section">
+                <div className="sp-editor-section-head">
+                  <FiActivity />
+                  <div><h3>Professional Bio</h3><span className="sp-bio-count">{formData.bio.length}/500</span></div>
                 </div>
-
                 <textarea
-                  name="bio"
-                  value={formData.bio}
-                  onChange={handleInputChange}
-                  maxLength={500}
-                  rows={5}
-                  placeholder="Write a short professional summary..."
+                  className="sp-bio-textarea" name="bio" value={formData.bio}
+                  onChange={handleInputChange} maxLength={500} rows={5}
+                  placeholder="Write a short professional summary that highlights your skills, interests, and career goals…"
                 />
               </div>
-
-              <div className="form-section">
-                <div className="form-section-heading">
-                  <h3>Online presence</h3>
-                  <p>Add links where recruiters can learn more about you.</p>
-                </div>
-
-                <div className="form-grid">
-                  <FormField
-                    label="GitHub URL"
-                    name="githubUrl"
-                    type="url"
-                    value={formData.githubUrl}
-                    onChange={handleInputChange}
-                    placeholder="github.com/yourname"
-                    icon={<FiGithub />}
-                  />
-
-                  <FormField
-                    label="LinkedIn URL"
-                    name="linkedinUrl"
-                    type="url"
-                    value={formData.linkedinUrl}
-                    onChange={handleInputChange}
-                    placeholder="linkedin.com/in/yourname"
-                    icon={<FiLinkedin />}
-                  />
-
-                  <FormField
-                    label="Portfolio URL"
-                    name="portfolioUrl"
-                    type="url"
-                    value={formData.portfolioUrl}
-                    onChange={handleInputChange}
-                    placeholder="yourportfolio.com"
-                    icon={<FiGlobe />}
-                  />
-
-                  <FormField
-                    label="Website URL"
-                    name="website"
-                    type="url"
-                    value={formData.website}
-                    onChange={handleInputChange}
-                    placeholder="yourwebsite.com"
-                    icon={<FiGlobe />}
-                  />
+              <div className="sp-editor-section">
+                <div className="sp-editor-section-head"><FiGlobe /><h3>Online Presence</h3></div>
+                <div className="sp-form-grid">
+                  <FormField label="GitHub URL" name="githubUrl" type="url" value={formData.githubUrl} onChange={handleInputChange} placeholder="github.com/yourname" icon={<FiGithub />} />
+                  <FormField label="LinkedIn URL" name="linkedinUrl" type="url" value={formData.linkedinUrl} onChange={handleInputChange} placeholder="linkedin.com/in/yourname" icon={<FiLinkedin />} />
+                  <FormField label="Portfolio URL" name="portfolioUrl" type="url" value={formData.portfolioUrl} onChange={handleInputChange} placeholder="yourportfolio.com" icon={<FiStar />} />
+                  <FormField label="Website URL" name="website" type="url" value={formData.website} onChange={handleInputChange} placeholder="yourwebsite.com" icon={<FiGlobe />} />
                 </div>
               </div>
-
-              <div className="form-actions">
-                <button
-                  type="button"
-                  className="secondary-action"
-                  onClick={handleReset}
-                  disabled={saving}
-                >
-                  <FiRefreshCw />
-                  Reset
+              <div className="sp-form-actions">
+                <button type="button" className="sp-action-secondary" onClick={handleReset} disabled={saving}>
+                  <FiRefreshCw /> Reset
                 </button>
-
-                <button
-                  type="submit"
-                  className="primary-action"
-                  disabled={saving || uploadingAvatar || uploadingResume}
-                >
-                  {saving ? (
-                    <>
-                      <FiLoader className="spin-animation" />
-                      Saving...
-                    </>
-                  ) : (
-                    <>
-                      <FiSave />
-                      Save changes
-                    </>
-                  )}
+                <button type="submit" className="sp-action-primary" disabled={saving || uploadingAvatar || uploadingResume}>
+                  {saving ? <><FiLoader className="sp-spin" /> Saving…</> : <><FiSave /> Save Changes</>}
                 </button>
               </div>
             </form>
-          </section>
+          </div>
         )}
-      </main>
+      </div>
     </DashboardLayout>
   );
 };
 
-const FormField = ({
-  label,
-  name,
-  type = 'text',
-  value,
-  onChange,
-  placeholder,
-  icon,
-  required = false,
-}) => (
-  <div className="field-group">
-    <label htmlFor={name}>
-      {label}
-      {required && <span className="required-mark">*</span>}
-    </label>
-
-    <div className="input-wrapper">
+const FormField = ({ label, name, type = 'text', value, onChange, placeholder, icon, required = false }) => (
+  <div className="sp-field">
+    <label htmlFor={name}>{label}{required && <span className="sp-required">*</span>}</label>
+    <div className="sp-input-wrap">
       {icon}
-      <input
-        id={name}
-        name={name}
-        type={type}
-        value={value}
-        onChange={onChange}
-        placeholder={placeholder}
-        required={required}
-        autoComplete="off"
-      />
+      <input id={name} name={name} type={type} value={value} onChange={onChange} placeholder={placeholder} required={required} autoComplete="off" />
     </div>
   </div>
 );
