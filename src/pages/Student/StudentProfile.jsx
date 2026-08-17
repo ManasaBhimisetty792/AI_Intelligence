@@ -98,8 +98,7 @@ export const StudentProfile = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
-  const [uploadingResume, setUploadingResume] = useState(false);
-  const [activeTab, setActiveTab] = useState('Overview');
+  const [editMode, setEditMode] = useState(false);
 
   const [formData, setFormData] = useState(getInitialFormData(user));
   const [skills, setSkills] = useState([]);
