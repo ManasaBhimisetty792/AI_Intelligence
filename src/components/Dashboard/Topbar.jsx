@@ -7,12 +7,20 @@ import ThemeToggle from '../common/ThemeToggle';
 import notificationService from '../../services/notificationService';
 import useRealtime from '../../hooks/useRealtime';
 
-export const Topbar = ({ title, onMenuToggle }) => {
+export const Topbar = ({
+  title,
+  onMenuToggle,
+  onToggleSidebar,
+  sidebarOpen = true,
+  mobileOpen = false,
+}) => {
   const { user, role: rawRole, logout } = useAuth();
   const role = typeof rawRole === 'string' ? rawRole : 'student';
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const navigate = useNavigate();
+
+  const handleSidebarToggle = onToggleSidebar || onMenuToggle;
 
   const fetchUnread = useCallback(async () => {
     try {
@@ -55,9 +63,10 @@ export const Topbar = ({ title, onMenuToggle }) => {
     <header className="dashboard-topbar glass-panel">
       <div className="topbar-left">
         <button
-          onClick={onMenuToggle}
-          className="topbar-mobile-menu-btn"
-          aria-label="Toggle Navigation Menu"
+          onClick={handleSidebarToggle}
+          className="topbar-sidebar-toggle-btn"
+          aria-label={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
+          title={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
         >
           <FiMenu />
         </button>

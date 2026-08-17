@@ -99,21 +99,23 @@ const addStoredDeletedId = (id) => {
 
 const getCurrentUser = async () => {
   if (!isSupabaseConfigured()) {
-    throw new Error(
-      "Supabase is not configured."
-    );
+    return null;
   }
 
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
+  try {
+    const {
+      data: { user },
+      error,
+    } = await supabase.auth.getUser();
 
-  if (error) {
-    throw error;
+    if (error) {
+      return null;
+    }
+
+    return user || null;
+  } catch {
+    return null;
   }
-
-  return user || null;
 };
 
 const getCurrentUserId = async () => {

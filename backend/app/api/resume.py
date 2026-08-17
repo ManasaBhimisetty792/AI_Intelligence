@@ -17,7 +17,7 @@ from fastapi import (
 )
 from fastapi.responses import JSONResponse
 
-from app.services.resume_engine import analyze, load_document
+from app.services.resume_engine import analyze, load_document, classify_document
 
 router = APIRouter(
     prefix="/resume",
@@ -26,15 +26,11 @@ router = APIRouter(
 
 
 def save_upload_file(upload_file: UploadFile) -> str:
-    """
-    Save UploadFile to a temporary file and return its path.
-    """
+    """Save UploadFile to a temporary file and return its path."""
     suffix = os.path.splitext(upload_file.filename or "")[1]
-
     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as temp:
         temp.write(upload_file.file.read())
         temp_path = temp.name
-
     return temp_path
 
 
@@ -45,34 +41,43 @@ async def analyze_resume(
     jd_file: Optional[UploadFile] = File(None),
 ):
     """
-    Analyze Resume against Job Description.
-    """
+    Analyze a resume against a job description.
 
+    - resume_file: PDF or DOCX resume file
+    - jd_text: Job description as plain text (mutually exclusive with jd_file)
+    - jd_file: Job description as a PDF or DOCX file
+    """
     if not jd_text and not jd_file:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Provide either jd_text or jd_file."
+            detail="Provide either jd_text or jd_file.",
         )
 
     resume_path = None
     jd_path = None
 
     try:
-        # -------------------------------
-        # Resume
-        # -------------------------------
+        # ── Resume ──────────────────────────────────────────────────
         resume_path = save_upload_file(resume_file)
         resume_text = load_document(resume_path)
 
         if not resume_text.strip():
             raise HTTPException(
                 status_code=422,
-                detail="Resume file is empty."
+                detail="Resume file is empty or contains no extractable text.",
             )
 
-        # -------------------------------
-        # Job Description
-        # -------------------------------
+        # Gate: verify this is actually a resume before running the
+        # full NLP pipeline. Catches JDs uploaded in the resume slot,
+        # invoices, reports, blank templates, and scanned images.
+        doc_check = classify_document(resume_text)
+        if not doc_check["is_resume"]:
+            raise HTTPException(
+                status_code=422,
+                detail=f"This doesn't look like a resume. {doc_check['reason']}",
+            )
+
+        # ── Job Description ──────────────────────────────────────────
         if jd_file:
             jd_path = save_upload_file(jd_file)
             jd_text = load_document(jd_path)
@@ -80,17 +85,15 @@ async def analyze_resume(
         if not jd_text or not jd_text.strip():
             raise HTTPException(
                 status_code=422,
-                detail="Job Description is empty."
+                detail="Job description is empty.",
             )
 
-        # -------------------------------
-        # AI Analysis
-        # -------------------------------
+        # ── Analysis ─────────────────────────────────────────────────
         result = analyze(resume_text, jd_text)
 
         return JSONResponse(
             status_code=200,
-            content=result.to_dict()
+            content=result.to_dict(),
         )
 
     except HTTPException:
@@ -99,12 +102,11 @@ async def analyze_resume(
     except Exception as e:
         raise HTTPException(
             status_code=500,
-            detail=f"Resume analysis failed: {str(e)}"
+            detail=f"Resume analysis failed: {str(e)}",
         )
 
     finally:
         if resume_path and os.path.exists(resume_path):
             os.remove(resume_path)
-
         if jd_path and os.path.exists(jd_path):
             os.remove(jd_path)

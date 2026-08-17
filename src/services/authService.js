@@ -470,18 +470,59 @@ export const authService = {
     password,
     role = 'student',
   }) {
-    if (
+    const isAdminCredentials =
       email === 'admin@skilltrack.ai' &&
-      password === 'Admin@123'
-    ) {
+      password === 'Admin@123';
+
+    // ─── Admin Login Flow ─────────────────────────────────────────────────────
+    // Try real Supabase auth first so the client gets a live JWT.
+    // If the admin account doesn't exist in Supabase Auth yet, fall back to mock.
+    if (isAdminCredentials && isSupabaseConfigured()) {
+      try {
+        const { data: adminAuthData, error: adminAuthError } =
+          await supabase.auth.signInWithPassword({ email, password });
+
+        if (!adminAuthError && adminAuthData?.session) {
+          // Real Supabase session established — fetch the profile
+          tokenStorage.set({
+            user: { id: adminAuthData.user.id, email, name: 'Admin', role: 'admin' },
+            access: adminAuthData.session.access_token,
+            refresh: adminAuthData.session.refresh_token,
+          });
+
+          const freshUser = await this.getCurrentUser();
+          const adminUser = {
+            ...(freshUser || MOCK_USERS.admin),
+            role: 'admin',
+            name: freshUser?.name || 'Admin',
+          };
+          tokenStorage.set({ user: adminUser, access: adminAuthData.session.access_token, refresh: adminAuthData.session.refresh_token });
+          return adminUser;
+        }
+      } catch (_) {
+        // fall through to mock below
+      }
+
+      // Supabase admin account not yet registered — use mock session.
+      // The Supabase client will still use the anon key for queries,
+      // so ensure your Supabase RLS allows unauthenticated reads.
       const adminUser = MOCK_USERS.admin;
-
       tokenStorage.set({
-  user: adminUser,
-  access: 'mock_admin_access_token',
-  refresh: 'mock_admin_refresh_token',
-});
+        user: adminUser,
+        access: 'mock_admin_access_token',
+        refresh: 'mock_admin_refresh_token',
+      });
+      return adminUser;
+    }
 
+    // ─── Non-Supabase fallback for pure-mock admin ────────────────────────────
+    if (isAdminCredentials && !isSupabaseConfigured()) {
+      const adminUser = MOCK_USERS.admin;
+      tokenStorage.set({
+        user: adminUser,
+        access: 'mock_admin_access_token',
+        refresh: 'mock_admin_refresh_token',
+      });
       return adminUser;
     }
 

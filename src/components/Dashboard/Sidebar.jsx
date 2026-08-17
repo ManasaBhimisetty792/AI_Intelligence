@@ -36,11 +36,10 @@ export const ADMIN_NAV = [
   { label: 'Dashboard', path: '/admin/dashboard', icon: <FiShield />, isFunctional: true },
   { label: 'Users', path: '/admin/users', icon: <FiUsers />, isFunctional: true },
   { label: 'Recruiters', path: '/admin/recruiter-verification', icon: <FiCheckCircle />, isFunctional: true },
-  { label: 'Students', path: '/admin/student-verification', icon: <FiUser />, isFunctional: false },
-  { label: 'Subscriptions', path: '/admin/subscriptions', icon: <FiCreditCard />, isFunctional: false },
+  { label: 'Subscriptions', path: '/admin/subscriptions', icon: <FiCreditCard />, isFunctional: true },
   { label: 'Notifications', path: '/admin/notifications', icon: <FiBell />, isFunctional: true },
   { label: 'Audit Logs', path: '/admin/audit-logs', icon: <FiFileText />, isFunctional: true },
-  { label: 'System Settings', path: '/admin/settings', icon: <FiSliders />, isFunctional: false },
+  { label: 'System Settings', path: '/admin/settings', icon: <FiSliders />, isFunctional: true },
 ];
 
 export const Sidebar = ({ sidebarOpen, setSidebarOpen, mobileOpen, setMobileOpen }) => {
@@ -82,13 +81,6 @@ export const Sidebar = ({ sidebarOpen, setSidebarOpen, mobileOpen, setMobileOpen
             </div>
             {sidebarOpen && <span className="brand-text">SkillTrack <span className="brand-accent">AI</span></span>}
           </Link>
-          <button
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="sidebar-toggle-btn desktop-only"
-            aria-label={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
-          >
-            {sidebarOpen ? <FiX /> : <FiMenu />}
-          </button>
           <button
             onClick={() => setMobileOpen(false)}
             className="sidebar-toggle-btn mobile-only"

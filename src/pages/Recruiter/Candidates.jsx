@@ -1,33 +1,15 @@
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
-
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  FiCalendar,
-  FiCheck,
-  FiEye,
-  FiFileText,
-  FiLoader,
-  FiRefreshCw,
-  FiVideo,
-  FiX,
+  FiCalendar, FiCheck, FiClock, FiEye, FiFileText, FiFilter,
+  FiLoader, FiRefreshCw, FiSearch, FiUser, FiX, FiArrowRight, FiCheckCircle, FiAlertCircle
 } from "react-icons/fi";
-
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 
 import DashboardLayout from "../../components/Dashboard/DashboardLayout";
 import recruiterService from "../../services/recruiterService";
-
-import {
-  getInterviewSessionPath,
-  isInterviewScheduled,
-} from "../../utils/interviewSession";
-
-// import "./Candidates.css";
+import CandidateDetailsModal from "./CandidateDetailsModal";
+import useRealtime from "../../hooks/useRealtime";
 
 const getStudentId = (request = {}) => {
   return (
@@ -47,9 +29,7 @@ const getCandidateName = (request = {}) => {
     request.student?.name ||
     request.full_name ||
     request.name ||
-    `Candidate ${
-      getStudentId(request).slice(0, 6) || ""
-    }`
+    `Candidate ${getStudentId(request).slice(0, 6) || ""}`
   );
 };
 
@@ -64,1367 +44,747 @@ const getCandidateEmail = (request = {}) => {
 };
 
 const getRequestStatus = (request = {}) => {
-  return String(
-    request.status || "pending"
-  ).toLowerCase();
+  return String(request.status || "pending").toLowerCase();
 };
 
-const getStatusDetails = (status) => {
+const getStatusBadge = (status) => {
   switch (status) {
     case "pending":
-      return {
-        label: "Pending",
-        background: "#fef3c7",
-        color: "#92400e",
-      };
-
+      return { label: "Pending Review", bg: "rgba(245, 158, 11, 0.15)", color: "#F59E0B" };
     case "accepted":
-      return {
-        label: "Accepted",
-        background: "#dcfce7",
-        color: "#166534",
-      };
-
+      return { label: "Accepted", bg: "rgba(16, 185, 129, 0.15)", color: "#10B981" };
     case "rejected":
-      return {
-        label: "Rejected",
-        background: "#fee2e2",
-        color: "#991b1b",
-      };
-
+      return { label: "Declined", bg: "rgba(239, 68, 68, 0.15)", color: "#EF4444" };
     case "reschedule_requested":
-      return {
-        label: "Reschedule Requested",
-        background: "#ede9fe",
-        color: "#6d28d9",
-      };
-
+      return { label: "Reschedule Proposed", bg: "rgba(139, 92, 246, 0.15)", color: "#8B5CF6" };
     case "reschedule_accepted":
-      return {
-        label: "Reschedule Accepted",
-        background: "#e0f2fe",
-        color: "#0369a1",
-      };
-
+      return { label: "Reschedule Accepted", bg: "rgba(14, 165, 233, 0.15)", color: "#0EA5E9" };
     case "waiting_recruiter_confirmation":
-      return {
-        label: "Awaiting Scheduling",
-        background: "#fef3c7",
-        color: "#92400e",
-      };
-
+      return { label: "Awaiting Scheduling", bg: "rgba(245, 158, 11, 0.15)", color: "#F59E0B" };
     case "completed":
-      return {
-        label: "Completed",
-        background: "#dbeafe",
-        color: "#1d4ed8",
-      };
-
-    case "cancelled":
-      return {
-        label: "Cancelled",
-        background: "#f1f5f9",
-        color: "#475569",
-      };
-
+      return { label: "Completed", bg: "rgba(59, 130, 246, 0.15)", color: "#3B82F6" };
     default:
-      return {
-        label: status || "Unknown",
-        background: "#f1f5f9",
-        color: "#475569",
-      };
+      return { label: status, bg: "rgba(148, 163, 184, 0.15)", color: "#94A3B8" };
   }
 };
 
-const formatDate = (value) => {
-  if (!value) {
-    return "Date not assigned";
-  }
+export const Candidates = () => {
+  const navigate = useNavigate();
+  const [requests, setRequests] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState("all");
 
-  const date = new Date(`${value}T00:00:00`);
+  // Modals state
+  const [selectedCandidate, setSelectedCandidate] = useState(null);
+  const [profileModalReq, setProfileModalReq] = useState(null);
+  const [declineModalReq, setDeclineModalReq] = useState(null);
+  const [declineReason, setDeclineReason] = useState("");
+  const [rescheduleModalReq, setRescheduleModalReq] = useState(null);
+  const [rescheduleDate, setRescheduleDate] = useState("");
+  const [rescheduleTime, setRescheduleTime] = useState("");
+  const [rescheduleReason, setRescheduleReason] = useState("");
+  const [submittingAction, setSubmittingAction] = useState(false);
 
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-
-  return date.toLocaleDateString("en-IN", {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
-};
-
-const formatTime = (value) => {
-  if (!value) {
-    return "Time not assigned";
-  }
-
-  const [hours, minutes] = String(value)
-    .split(":")
-    .map(Number);
-
-  if (
-    Number.isNaN(hours) ||
-    Number.isNaN(minutes)
-  ) {
-    return value;
-  }
-
-  const date = new Date();
-
-  date.setHours(hours);
-  date.setMinutes(minutes);
-  date.setSeconds(0);
-
-  return date.toLocaleTimeString("en-IN", {
-    hour: "numeric",
-    minute: "2-digit",
-  });
-};
-
-const ScheduleSessionModal = ({
-  request,
-  onClose,
-  onScheduled,
-}) => {
-  const [meetingDate, setMeetingDate] =
-    useState("");
-
-  const [meetingTime, setMeetingTime] =
-    useState("");
-
-  const [saving, setSaving] =
-    useState(false);
-
-  const candidateName =
-    getCandidateName(request);
-
-  const handleSubmit = async (event) => {
-    event.preventDefault();
-
-    const requestId =
-      request.id || request.request_id;
-
-    const candidateUserId =
-      getStudentId(request);
-
-    if (!requestId) {
-      toast.error(
-        "Interview request ID is missing."
-      );
-      return;
-    }
-
-    if (!candidateUserId) {
-      toast.error(
-        "Candidate user ID is missing."
-      );
-      return;
-    }
-
-    if (!meetingDate || !meetingTime) {
-      toast.error(
-        "Please select both date and time."
-      );
-      return;
-    }
-
-    setSaving(true);
+  const fetchRequests = useCallback(async (isRefresh = false) => {
+    if (isRefresh) setRefreshing(true);
+    else setLoading(true);
 
     try {
-      const updatedRequest =
-        await recruiterService.assignInterviewSlot({
-          requestId,
-          candidateUserId,
-          meetingDate,
-          meetingTime,
-        });
-
-      toast.success(
-        `Session scheduled with ${candidateName}.`
-      );
-
-      onScheduled(updatedRequest);
-      onClose();
-    } catch (error) {
-      console.error(
-        "Failed to schedule interview:",
-        error
-      );
-
-      toast.error(
-        error?.message ||
-          "Failed to assign the interview session."
-      );
+      const data = await recruiterService.getInterviewRequestsForRecruiter();
+      setRequests(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error("Failed to load candidates requests:", err);
+      toast.error("Failed to load interview requests.");
     } finally {
-      setSaving(false);
+      setLoading(false);
+      setRefreshing(false);
     }
-  };
-
-  return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="schedule-session-title"
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 1200,
-        background: "rgba(15, 23, 42, 0.7)",
-        backdropFilter: "blur(5px)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: "1rem",
-      }}
-    >
-      <form
-        onSubmit={handleSubmit}
-        className="glass-card"
-        style={{
-          width: "100%",
-          maxWidth: 460,
-          padding: "1.5rem",
-          background: "#ffffff",
-          borderRadius: 16,
-          boxShadow:
-            "0 20px 50px rgba(15, 23, 42, 0.25)",
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: "1rem",
-            marginBottom: "1rem",
-          }}
-        >
-          <h2
-            id="schedule-session-title"
-            style={{
-              margin: 0,
-              fontSize: "1.2rem",
-              color: "#0f172a",
-            }}
-          >
-            Schedule Session
-          </h2>
-
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={saving}
-            aria-label="Close schedule modal"
-            style={{
-              border: "none",
-              background: "transparent",
-              color: "#475569",
-              cursor: saving
-                ? "not-allowed"
-                : "pointer",
-              fontSize: "1.25rem",
-            }}
-          >
-            <FiX />
-          </button>
-        </div>
-
-        <p
-          style={{
-            margin: "0 0 1rem",
-            color: "#64748b",
-            fontSize: "0.88rem",
-            lineHeight: 1.5,
-          }}
-        >
-          Assign the final interview date and
-          time for{" "}
-          <strong>{candidateName}</strong>.
-        </p>
-
-        <label
-          htmlFor="meeting-date"
-          style={{
-            display: "block",
-            marginBottom: "0.4rem",
-            color: "#334155",
-            fontWeight: 700,
-            fontSize: "0.86rem",
-          }}
-        >
-          Interview Date
-        </label>
-
-        <input
-          id="meeting-date"
-          type="date"
-          value={meetingDate}
-          min={new Date()
-            .toISOString()
-            .slice(0, 10)}
-          onChange={(event) =>
-            setMeetingDate(event.target.value)
-          }
-          required
-          disabled={saving}
-          style={{
-            width: "100%",
-            boxSizing: "border-box",
-            padding: "0.7rem",
-            border: "1px solid #cbd5e1",
-            borderRadius: 8,
-            color: "#0f172a",
-            background: "#ffffff",
-          }}
-        />
-
-        <label
-          htmlFor="meeting-time"
-          style={{
-            display: "block",
-            marginTop: "1rem",
-            marginBottom: "0.4rem",
-            color: "#334155",
-            fontWeight: 700,
-            fontSize: "0.86rem",
-          }}
-        >
-          Interview Time
-        </label>
-
-        <input
-          id="meeting-time"
-          type="time"
-          value={meetingTime}
-          onChange={(event) =>
-            setMeetingTime(event.target.value)
-          }
-          required
-          disabled={saving}
-          style={{
-            width: "100%",
-            boxSizing: "border-box",
-            padding: "0.7rem",
-            border: "1px solid #cbd5e1",
-            borderRadius: 8,
-            color: "#0f172a",
-            background: "#ffffff",
-          }}
-        />
-
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "flex-end",
-            gap: "0.75rem",
-            marginTop: "1.35rem",
-          }}
-        >
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={saving}
-            className="btn btn-outline"
-          >
-            Cancel
-          </button>
-
-          <button
-            type="submit"
-            disabled={saving}
-            className="btn btn-primary"
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "0.4rem",
-            }}
-          >
-            {saving ? (
-              <FiLoader className="spin-animation" />
-            ) : (
-              <FiCalendar />
-            )}
-
-            {saving
-              ? "Assigning..."
-              : "Assign Session"}
-          </button>
-        </div>
-      </form>
-    </div>
-  );
-};
-
-const CandidateCard = ({
-  request,
-  onAccept,
-  onReject,
-  onSchedule,
-  onJoin,
-  onView,
-}) => {
-  const status =
-    getRequestStatus(request);
-
-  const statusDetails =
-    getStatusDetails(status);
-
-  const candidateName =
-    getCandidateName(request);
-
-  const candidateEmail =
-    getCandidateEmail(request);
-
-  const scheduled =
-    isInterviewScheduled(request);
-
-  const canSchedule =
-    !scheduled &&
-    (
-      status === "accepted" ||
-      status === "reschedule_accepted" ||
-      status ===
-        "waiting_recruiter_confirmation" ||
-      status === "reschedule_requested"
-    );
-
-  const canRespond =
-    status === "pending";
-
-  return (
-    <article
-      className="glass-card"
-      style={{
-        padding: "1.15rem",
-        borderRadius: 14,
-        display: "flex",
-        flexDirection: "column",
-        gap: "0.9rem",
-      }}
-    >
-      <div
-        style={{
-          display: "flex",
-          alignItems: "flex-start",
-          justifyContent: "space-between",
-          gap: "1rem",
-          flexWrap: "wrap",
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "0.8rem",
-            minWidth: 0,
-          }}
-        >
-          <img
-            src={`https://ui-avatars.com/api/?name=${encodeURIComponent(
-              candidateName
-            )}&background=4f46e5&color=fff&size=96`}
-            alt=""
-            style={{
-              width: 54,
-              height: 54,
-              borderRadius: "50%",
-              border: "2px solid var(--color-primary)",
-              flexShrink: 0,
-            }}
-          />
-
-          <div style={{ minWidth: 0 }}>
-            <h3
-              style={{
-                margin: 0,
-                color: "var(--color-text)",
-                fontSize: "1rem",
-                fontWeight: 800,
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-              }}
-            >
-              {candidateName}
-            </h3>
-
-            <p
-              style={{
-                margin: "0.2rem 0 0",
-                color: "var(--color-muted)",
-                fontSize: "0.82rem",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-              }}
-            >
-              {candidateEmail || "Email unavailable"}
-            </p>
-          </div>
-        </div>
-
-        <span
-          style={{
-            padding: "0.35rem 0.7rem",
-            borderRadius: 999,
-            background: statusDetails.background,
-            color: statusDetails.color,
-            fontSize: "0.75rem",
-            fontWeight: 800,
-            whiteSpace: "nowrap",
-          }}
-        >
-          {scheduled
-            ? "Session Scheduled"
-            : statusDetails.label}
-        </span>
-      </div>
-
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns:
-            "repeat(auto-fit, minmax(180px, 1fr))",
-          gap: "0.65rem",
-          color: "var(--color-muted)",
-          fontSize: "0.82rem",
-        }}
-      >
-        <div>
-          <strong
-            style={{
-              display: "block",
-              color: "var(--color-text)",
-              marginBottom: "0.2rem",
-            }}
-          >
-            Interview type
-          </strong>
-
-          {request.interview_type ||
-            "Technical Interview"}
-        </div>
-
-        <div>
-          <strong
-            style={{
-              display: "block",
-              color: "var(--color-text)",
-              marginBottom: "0.2rem",
-            }}
-          >
-            Requested slot
-          </strong>
-
-          {request.preferred_datetime
-            ? new Date(
-                request.preferred_datetime
-              ).toLocaleString("en-IN")
-            : "Not specified"}
-        </div>
-
-        {scheduled && (
-          <div>
-            <strong
-              style={{
-                display: "block",
-                color: "var(--color-text)",
-                marginBottom: "0.2rem",
-              }}
-            >
-              Final session
-            </strong>
-
-            {formatDate(request.meeting_date)}
-            {" · "}
-            {formatTime(request.meeting_time)}
-          </div>
-        )}
-      </div>
-
-      {request.message && (
-        <p
-          style={{
-            margin: 0,
-            padding: "0.7rem",
-            borderRadius: 8,
-            background: "rgba(148, 163, 184, 0.1)",
-            color: "var(--color-muted)",
-            fontSize: "0.82rem",
-            fontStyle: "italic",
-          }}
-        >
-          “{request.message}”
-        </p>
-      )}
-
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: "0.55rem",
-          flexWrap: "wrap",
-        }}
-      >
-        {canRespond && (
-          <>
-            <button
-              type="button"
-              onClick={() => onAccept(request)}
-              className="btn btn-primary"
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "0.35rem",
-              }}
-            >
-              <FiCheck />
-              Accept
-            </button>
-
-            <button
-              type="button"
-              onClick={() => onReject(request)}
-              className="btn btn-outline"
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "0.35rem",
-              }}
-            >
-              <FiX />
-              Decline
-            </button>
-          </>
-        )}
-
-        {canSchedule && (
-          <button
-            type="button"
-            onClick={() => onSchedule(request)}
-            className="btn btn-primary"
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "0.35rem",
-            }}
-          >
-            <FiCalendar />
-            Schedule Session
-          </button>
-        )}
-
-        {scheduled && (
-          <button
-            type="button"
-            onClick={() => onJoin(request)}
-            className="btn btn-primary"
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "0.35rem",
-              background:
-                "linear-gradient(135deg, #10b981, #14b8a6)",
-            }}
-          >
-            <FiVideo />
-            Join Interview
-          </button>
-        )}
-
-        <button
-          type="button"
-          onClick={() => onView(request)}
-          className="btn btn-outline"
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: "0.35rem",
-          }}
-        >
-          <FiEye />
-          View
-        </button>
-      </div>
-    </article>
-  );
-};
-
-const Candidates = () => {
-  const navigate = useNavigate();
-
-  const [requests, setRequests] =
-    useState([]);
-
-  const [loading, setLoading] =
-    useState(true);
-
-  const [refreshing, setRefreshing] =
-    useState(false);
-
-  const [error, setError] =
-    useState("");
-
-  const [filter, setFilter] =
-    useState("all");
-
-  const [search, setSearch] =
-    useState("");
-
-  const [schedulingCandidate, setSchedulingCandidate] =
-    useState(null);
-
-  const [selectedCandidate, setSelectedCandidate] =
-    useState(null);
-
-  const fetchRequests = useCallback(
-    async (isRefresh = false) => {
-      try {
-        if (isRefresh) {
-          setRefreshing(true);
-        } else {
-          setLoading(true);
-        }
-
-        setError("");
-
-        const data =
-          await recruiterService.getInterviewRequestsForRecruiter();
-
-        setRequests(
-          Array.isArray(data) ? data : []
-        );
-      } catch (fetchError) {
-        console.error(
-          "Failed to load interview requests:",
-          fetchError
-        );
-
-        setError(
-          fetchError?.message ||
-            "Failed to load interview requests."
-        );
-      } finally {
-        setLoading(false);
-        setRefreshing(false);
-      }
-    },
-    []
-  );
+  }, []);
 
   useEffect(() => {
     fetchRequests();
   }, [fetchRequests]);
 
-  useEffect(() => {
-    const interval = window.setInterval(() => {
-      fetchRequests(true);
-    }, 30000);
+  useRealtime(["interview_requests"], () => fetchRequests(true));
 
-    return () => {
-      window.clearInterval(interval);
-    };
-  }, [fetchRequests]);
-
-  const visibleRequests = useMemo(() => {
-    const normalizedSearch =
-      search.trim().toLowerCase();
-
-    return requests.filter((request) => {
-      const status =
-        getRequestStatus(request);
-
-      const name =
-        getCandidateName(request)
-          .toLowerCase();
-
-      const email =
-        getCandidateEmail(request)
-          .toLowerCase();
-
-      const matchesSearch =
-        !normalizedSearch ||
-        name.includes(normalizedSearch) ||
-        email.includes(normalizedSearch);
-
-      const matchesFilter =
-        filter === "all" ||
-        status === filter ||
-        (
-          filter === "scheduled" &&
-          isInterviewScheduled(request)
-        );
-
-      return (
-        matchesSearch &&
-        matchesFilter
-      );
-    });
-  }, [requests, filter, search]);
-
-  const updateRequestLocally = (
-    requestId,
-    changes
-  ) => {
-    setRequests((current) =>
-      current.map((request) =>
-        request.id === requestId
-          ? {
-              ...request,
-              ...changes,
-            }
-          : request
-      )
-    );
-  };
-
+  // Accept request handler
   const handleAccept = async (request) => {
-    const requestId =
-      request.id || request.request_id;
-
-    const candidateUserId =
-      getStudentId(request);
+    const requestId = request.id || request.request_id;
+    const candidateUserId = getStudentId(request);
+    const candidateName = getCandidateName(request);
 
     if (!requestId || !candidateUserId) {
-      toast.error(
-        "Request or candidate ID is missing."
-      );
+      toast.error("Invalid request or candidate ID.");
       return;
     }
 
     try {
-      await recruiterService.acceptInterviewRequest(
-        requestId,
-        candidateUserId,
-        "Recruiter",
-        getCandidateEmail(request)
+      setSubmittingAction(true);
+      await recruiterService.acceptInterviewRequest(requestId, candidateUserId, "Recruiter");
+      toast.success(`Accepted request from ${candidateName}. Proceed to Schedule to assign slot.`);
+      setRequests((prev) =>
+        prev.map((r) => (r.id === requestId ? { ...r, status: "accepted" } : r))
       );
-
-      updateRequestLocally(requestId, {
-        status: "accepted",
-        meeting_date: null,
-        meeting_time: null,
-        meeting_id: null,
-        meeting_link: null,
-      });
-
-      toast.success(
-        "Request accepted. Assign the final session slot next."
-      );
-    } catch (acceptError) {
-      console.error(
-        "Failed to accept request:",
-        acceptError
-      );
-
-      toast.error(
-        acceptError?.message ||
-          "Failed to accept request."
-      );
+    } catch (err) {
+      console.error("Error accepting request:", err);
+      toast.error(err?.message || "Failed to accept interview request.");
+    } finally {
+      setSubmittingAction(false);
     }
   };
 
-  const handleReject = async (request) => {
-    const requestId =
-      request.id || request.request_id;
+  // Decline request handler
+  const handleConfirmDecline = async (e) => {
+    e.preventDefault();
+    if (!declineModalReq) return;
 
-    const candidateUserId =
-      getStudentId(request);
-
-    if (!requestId || !candidateUserId) {
-      toast.error(
-        "Request or candidate ID is missing."
-      );
-      return;
-    }
-
-    const confirmed = window.confirm(
-      `Decline the interview request from ${getCandidateName(
-        request
-      )}?`
-    );
-
-    if (!confirmed) {
-      return;
-    }
+    const requestId = declineModalReq.id || declineModalReq.request_id;
+    const candidateUserId = getStudentId(declineModalReq);
 
     try {
-      if (
-        typeof recruiterService.rejectInterviewRequest ===
-        "function"
-      ) {
-        await recruiterService.rejectInterviewRequest(
-          requestId,
-          candidateUserId
-        );
-      } else if (
-        typeof recruiterService.rejectOrRescheduleRequest ===
-        "function"
-      ) {
-        await recruiterService.rejectOrRescheduleRequest(
-          requestId,
-          "rejected",
-          "Declined by recruiter"
-        );
-      } else {
-        throw new Error(
-          "Reject request service method is missing."
-        );
-      }
-
-      updateRequestLocally(requestId, {
-        status: "rejected",
+      setSubmittingAction(true);
+      await recruiterService.rejectOrRescheduleRequest(requestId, candidateUserId, {
+        action: "reject",
+        rejectReason: declineReason || "Recruiter schedule conflict",
       });
-
-      toast.success("Request declined.");
-    } catch (rejectError) {
-      console.error(
-        "Failed to reject request:",
-        rejectError
+      toast.success("Interview request declined.");
+      setRequests((prev) =>
+        prev.map((r) => (r.id === requestId ? { ...r, status: "rejected" } : r))
       );
-
-      toast.error(
-        rejectError?.message ||
-          "Failed to decline request."
-      );
+      setDeclineModalReq(null);
+      setDeclineReason("");
+    } catch (err) {
+      console.error("Error declining request:", err);
+      toast.error("Failed to decline request.");
+    } finally {
+      setSubmittingAction(false);
     }
   };
 
-  const handleSchedule = (request) => {
-    setSchedulingCandidate(request);
-  };
+  // Reschedule request handler
+  const handleConfirmReschedule = async (e) => {
+    e.preventDefault();
+    if (!rescheduleModalReq) return;
 
-  const handleScheduled = (updatedRequest) => {
-    if (!updatedRequest?.id) {
-      fetchRequests(true);
+    if (!rescheduleDate || !rescheduleTime) {
+      toast.error("Please specify both proposed date and time.");
       return;
     }
 
-    updateRequestLocally(
-      updatedRequest.id,
-      updatedRequest
-    );
+    const requestId = rescheduleModalReq.id || rescheduleModalReq.request_id;
+    const candidateUserId = getStudentId(rescheduleModalReq);
 
-    fetchRequests(true);
-  };
-
-  const handleJoin = (request) => {
-    if (!isInterviewScheduled(request)) {
-      toast.error(
-        "The final interview date and time are not assigned yet."
+    try {
+      setSubmittingAction(true);
+      await recruiterService.rejectOrRescheduleRequest(requestId, candidateUserId, {
+        action: "reschedule",
+        newDate: rescheduleDate,
+        newTime: rescheduleTime,
+        rejectReason: rescheduleReason || "Proposed alternative time slot",
+      });
+      toast.success("Reschedule proposal sent to student.");
+      setRequests((prev) =>
+        prev.map((r) =>
+          r.id === requestId
+            ? {
+                ...r,
+                status: "reschedule_requested",
+                reschedule_datetime: `${rescheduleDate}T${rescheduleTime}:00`,
+                reschedule_reason: rescheduleReason,
+              }
+            : r
+        )
       );
-      return;
+      setRescheduleModalReq(null);
+      setRescheduleDate("");
+      setRescheduleTime("");
+      setRescheduleReason("");
+    } catch (err) {
+      console.error("Error proposing reschedule:", err);
+      toast.error("Failed to submit reschedule.");
+    } finally {
+      setSubmittingAction(false);
     }
-
-    navigate(
-      getInterviewSessionPath(request.id)
-    );
   };
 
-  const handleView = (request) => {
-    setSelectedCandidate(request);
-  };
+  // Filter requests
+  const filteredRequests = useMemo(() => {
+    return requests.filter((r) => {
+      const name = getCandidateName(r).toLowerCase();
+      const email = getCandidateEmail(r).toLowerCase();
+      const type = (r.interview_type || "").toLowerCase();
+      const query = search.toLowerCase().trim();
+
+      const matchesSearch = !query || name.includes(query) || email.includes(query) || type.includes(query);
+      const status = getRequestStatus(r);
+
+      if (!matchesSearch) return false;
+
+      if (filter === "all") return true;
+      if (filter === "pending") return status === "pending";
+      if (filter === "accepted") return status === "accepted" || status === "reschedule_accepted" || status === "waiting_recruiter_confirmation";
+      if (filter === "reschedule") return status === "reschedule_requested";
+      if (filter === "rejected") return status === "rejected";
+      if (filter === "completed") return status === "completed";
+      return true;
+    });
+  }, [requests, search, filter]);
+
+  const pendingCount = requests.filter((r) => getRequestStatus(r) === "pending").length;
 
   return (
-    <DashboardLayout title="Candidates">
-      <main
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          gap: "1rem",
-        }}
-      >
-        <section
+    <DashboardLayout title="Interview Requests">
+      <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem", width: "100%" }}>
+        
+        {/* Header Banner */}
+        <div
           className="glass-card"
           style={{
-            padding: "1.15rem",
+            padding: "1.25rem 1.5rem",
             display: "flex",
-            alignItems: "center",
             justifyContent: "space-between",
-            gap: "1rem",
+            alignItems: "center",
             flexWrap: "wrap",
+            gap: "1rem",
           }}
         >
           <div>
-            <h1
-              style={{
-                margin: 0,
-                fontSize: "1.35rem",
-                fontWeight: 800,
-              }}
-            >
-              Candidates
+            <h1 style={{ margin: 0, fontSize: "1.35rem", fontWeight: 800, color: "var(--color-text)" }}>
+              Candidate Interview Requests
             </h1>
-
-            <p
-              style={{
-                margin: "0.3rem 0 0",
-                color: "var(--color-muted)",
-                fontSize: "0.84rem",
-              }}
-            >
-              Manage interview requests and
-              schedule final interview sessions.
+            <p style={{ margin: "0.25rem 0 0", color: "var(--color-muted)", fontSize: "0.85rem" }}>
+              Review student applications, inspect candidate profiles, accept or reschedule requests.
             </p>
           </div>
 
           <button
-            type="button"
             onClick={() => fetchRequests(true)}
             className="btn btn-secondary"
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "0.4rem",
-            }}
+            style={{ display: "inline-flex", alignItems: "center", gap: "0.4rem", fontSize: "0.82rem" }}
           >
-            <FiRefreshCw
-              className={
-                refreshing
-                  ? "spin-animation"
-                  : ""
-              }
-            />
-            Refresh
+            <FiRefreshCw className={refreshing ? "spin-animation" : ""} /> Refresh
           </button>
-        </section>
+        </div>
 
-        <section
+        {/* Filters and Search Bar */}
+        <div
           className="glass-card"
           style={{
-            padding: "1rem",
+            padding: "1rem 1.25rem",
             display: "flex",
             alignItems: "center",
-            gap: "0.75rem",
+            justifyContent: "space-between",
             flexWrap: "wrap",
+            gap: "0.85rem",
           }}
         >
-          <input
-            type="search"
-            value={search}
-            onChange={(event) =>
-              setSearch(event.target.value)
-            }
-            placeholder="Search candidate or email..."
-            style={{
-              flex: "1 1 240px",
-              minWidth: 220,
-              padding: "0.7rem 0.8rem",
-              border: "1px solid #cbd5e1",
-              borderRadius: 8,
-            }}
-          />
-
-          <select
-            value={filter}
-            onChange={(event) =>
-              setFilter(event.target.value)
-            }
-            style={{
-              padding: "0.7rem 0.8rem",
-              border: "1px solid #cbd5e1",
-              borderRadius: 8,
-              minWidth: 170,
-            }}
-          >
-            <option value="all">
-              All requests
-            </option>
-            <option value="pending">
-              Pending
-            </option>
-            <option value="accepted">
-              Accepted
-            </option>
-            <option value="scheduled">
-              Scheduled
-            </option>
-            <option value="completed">
-              Completed
-            </option>
-            <option value="rejected">
-              Rejected
-            </option>
-          </select>
-        </section>
-
-        <section
-          className="glass-card"
-          style={{
-            padding: "1rem",
-          }}
-        >
-          {loading ? (
-            <div
-              style={{
-                padding: "3rem",
-                textAlign: "center",
-                color: "var(--color-muted)",
-              }}
-            >
-              <FiLoader
-                className="spin-animation"
-                style={{
-                  fontSize: "2rem",
-                  marginBottom: "0.75rem",
-                }}
-              />
-
-              <p style={{ margin: 0 }}>
-                Loading candidates...
-              </p>
-            </div>
-          ) : error ? (
-            <div
-              style={{
-                padding: "2rem",
-                textAlign: "center",
-                color: "#dc2626",
-              }}
-            >
-              <FiFileText
-                style={{
-                  fontSize: "2rem",
-                  marginBottom: "0.6rem",
-                }}
-              />
-
-              <p>{error}</p>
-
+          <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+            {[
+              { id: "all", label: "All Requests" },
+              { id: "pending", label: `Pending (${pendingCount})` },
+              { id: "accepted", label: "Accepted" },
+              { id: "reschedule", label: "Reschedule Proposed" },
+              { id: "completed", label: "Completed" },
+              { id: "rejected", label: "Declined" },
+            ].map((tab) => (
               <button
-                type="button"
-                onClick={() =>
-                  fetchRequests(true)
-                }
-                className="btn btn-primary"
+                key={tab.id}
+                onClick={() => setFilter(tab.id)}
+                style={{
+                  padding: "0.45rem 0.85rem",
+                  borderRadius: "var(--radius-md)",
+                  border: filter === tab.id ? "1px solid var(--color-primary)" : "1px solid var(--color-border)",
+                  background: filter === tab.id ? "var(--color-primary)" : "transparent",
+                  color: filter === tab.id ? "#ffffff" : "var(--color-muted)",
+                  fontWeight: 700,
+                  fontSize: "0.8rem",
+                  cursor: "pointer",
+                  transition: "all var(--transition-fast)",
+                }}
               >
-                Try Again
+                {tab.label}
               </button>
-            </div>
-          ) : visibleRequests.length === 0 ? (
-            <div
+            ))}
+          </div>
+
+          <div style={{ position: "relative", minWidth: 260 }}>
+            <FiSearch
               style={{
-                padding: "3rem",
-                textAlign: "center",
+                position: "absolute",
+                left: "0.85rem",
+                top: "50%",
+                transform: "translateY(-50%)",
                 color: "var(--color-muted)",
               }}
-            >
-              <FiFileText
-                style={{
-                  fontSize: "2.5rem",
-                  opacity: 0.45,
-                  marginBottom: "0.75rem",
-                }}
-              />
+            />
+            <input
+              type="search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search candidate or role..."
+              style={{
+                width: "100%",
+                padding: "0.55rem 0.85rem 0.55rem 2.4rem",
+                borderRadius: "var(--radius-md)",
+                border: "1px solid var(--color-border)",
+                background: "var(--color-surface)",
+                color: "var(--color-text)",
+                fontSize: "0.84rem",
+                outline: "none",
+              }}
+            />
+          </div>
+        </div>
 
-              <h3
-                style={{
-                  margin: 0,
-                  color: "var(--color-text)",
-                }}
-              >
-                No candidates found
-              </h3>
-
-              <p
-                style={{
-                  margin: "0.35rem 0 0",
-                  fontSize: "0.85rem",
-                }}
-              >
-                New interview requests will appear
-                here.
+        {/* Requests List: Full Width Horizontal Containers */}
+        <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+          {loading ? (
+            <div className="glass-card" style={{ padding: "3.5rem", textAlign: "center", color: "var(--color-muted)" }}>
+              <FiLoader className="spin-animation" style={{ fontSize: "2rem", marginBottom: "0.6rem" }} />
+              <div>Loading candidate requests...</div>
+            </div>
+          ) : filteredRequests.length === 0 ? (
+            <div className="glass-card" style={{ padding: "3.5rem", textAlign: "center", color: "var(--color-muted)" }}>
+              <FiFileText size={42} style={{ opacity: 0.35, marginBottom: "0.75rem" }} />
+              <h3 style={{ margin: 0, color: "var(--color-text)", fontSize: "1.05rem" }}>No interview requests found</h3>
+              <p style={{ margin: "0.3rem 0 0", fontSize: "0.85rem" }}>
+                {search ? "Try searching with different keywords." : "New interview requests will appear here."}
               </p>
             </div>
           ) : (
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns:
-                  "repeat(auto-fit, minmax(300px, 1fr))",
-                gap: "1rem",
-              }}
-            >
-              {visibleRequests.map((request) => (
-                <CandidateCard
-                  key={request.id}
-                  request={request}
-                  onAccept={handleAccept}
-                  onReject={handleReject}
-                  onSchedule={handleSchedule}
-                  onJoin={handleJoin}
-                  onView={handleView}
-                />
-              ))}
-            </div>
-          )}
-        </section>
+            filteredRequests.map((req) => {
+              const status = getRequestStatus(req);
+              const statusBadge = getStatusBadge(status);
+              const name = getCandidateName(req);
+              const email = getCandidateEmail(req);
+              const isPending = status === "pending";
+              const isAccepted = status === "accepted" || status === "reschedule_accepted" || status === "waiting_recruiter_confirmation";
+              const isScheduled = Boolean(req.meeting_date && (req.meeting_time || req.start_time));
 
-        {selectedCandidate && (
+              return (
+                <div
+                  key={req.id}
+                  className="glass-card"
+                  style={{
+                    padding: "1.25rem 1.5rem",
+                    borderRadius: "var(--radius-xl)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    flexWrap: "wrap",
+                    gap: "1.25rem",
+                    border: isPending ? "1px solid rgba(245, 158, 11, 0.35)" : "1px solid var(--color-border)",
+                    boxShadow: isPending ? "0 4px 20px rgba(245, 158, 11, 0.06)" : "var(--shadow-sm)",
+                    transition: "transform 0.2s, box-shadow 0.2s",
+                  }}
+                >
+                  {/* Left Column: Avatar & Basic Info */}
+                  <div style={{ display: "flex", alignItems: "center", gap: "1rem", minWidth: 260, flex: "1 1 300px" }}>
+                    <img
+                      src={
+                        req.candidate_avatar ||
+                        req.student?.avatar_url ||
+                        `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=4f46e5&color=fff&size=100`
+                      }
+                      alt={name}
+                      style={{
+                        width: 56,
+                        height: 56,
+                        borderRadius: "50%",
+                        objectFit: "cover",
+                        border: "2px solid var(--color-primary)",
+                        flexShrink: 0,
+                      }}
+                    />
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
+                        <span style={{ fontWeight: 800, fontSize: "1.05rem", color: "var(--color-text)" }}>
+                          {name}
+                        </span>
+                        <span
+                          style={{
+                            padding: "0.2rem 0.6rem",
+                            borderRadius: "999px",
+                            background: statusBadge.bg,
+                            color: statusBadge.color,
+                            fontSize: "0.72rem",
+                            fontWeight: 800,
+                            letterSpacing: "0.02em",
+                          }}
+                        >
+                          {statusBadge.label}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: "0.82rem", color: "var(--color-muted)", marginTop: "0.15rem" }}>
+                        {email || "Email not specified"}
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", marginTop: "0.35rem" }}>
+                        <span style={{ fontSize: "0.76rem", fontWeight: 700, color: "var(--color-primary)", background: "var(--color-primary-light)", padding: "0.15rem 0.5rem", borderRadius: "4px" }}>
+                          {req.interview_type || "Technical Deep Dive"}
+                        </span>
+                        {req.ats_score && (
+                          <span style={{ fontSize: "0.75rem", color: "#10B981", fontWeight: 800 }}>
+                            ★ {req.ats_score}% Match
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Middle Column: Preferred Schedule & Student Notes */}
+                  <div style={{ flex: "2 1 320px", minWidth: 240 }}>
+                    <div style={{ fontSize: "0.82rem", color: "var(--color-muted)", display: "flex", alignItems: "center", gap: "0.4rem", marginBottom: "0.35rem" }}>
+                      <FiCalendar style={{ color: "var(--color-primary)" }} />
+                      <strong>Requested Slot:</strong>{" "}
+                      {req.preferred_datetime
+                        ? new Date(req.preferred_datetime).toLocaleString("en-IN", {
+                            weekday: "short",
+                            day: "numeric",
+                            month: "short",
+                            year: "numeric",
+                            hour: "numeric",
+                            minute: "2-digit",
+                          })
+                        : "Flexible timing"}
+                    </div>
+
+                    {req.message && (
+                      <div
+                        style={{
+                          fontSize: "0.8rem",
+                          color: "var(--color-text)",
+                          background: "var(--color-surface-sec)",
+                          borderLeft: "3px solid var(--color-primary)",
+                          padding: "0.4rem 0.65rem",
+                          borderRadius: "0 6px 6px 0",
+                          fontStyle: "italic",
+                          lineHeight: 1.4,
+                        }}
+                      >
+                        "{req.message}"
+                      </div>
+                    )}
+
+                    {status === "reschedule_requested" && req.reschedule_datetime && (
+                      <div style={{ fontSize: "0.78rem", color: "#8B5CF6", marginTop: "0.3rem", fontWeight: 700 }}>
+                        ⏳ Reschedule proposed: {new Date(req.reschedule_datetime).toLocaleString()}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Right Column: Action Buttons */}
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap", justifyContent: "flex-end" }}>
+                    <button
+                      type="button"
+                      onClick={() => setProfileModalReq(req)}
+                      className="btn btn-outline"
+                      style={{ padding: "0.5rem 0.85rem", fontSize: "0.82rem", display: "inline-flex", alignItems: "center", gap: "0.35rem" }}
+                      title="View Candidate Full Profile"
+                    >
+                      <FiEye /> View Profile
+                    </button>
+
+                    {/* Pending actions: Accept, Decline, Reschedule */}
+                    {isPending && (
+                      <>
+                        <button
+                          type="button"
+                          disabled={submittingAction}
+                          onClick={() => handleAccept(req)}
+                          className="btn btn-primary"
+                          style={{
+                            padding: "0.5rem 0.95rem",
+                            fontSize: "0.82rem",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "0.35rem",
+                            background: "linear-gradient(135deg, #10b981, #059669)",
+                            boxShadow: "0 2px 8px rgba(16, 185, 129, 0.25)",
+                          }}
+                        >
+                          <FiCheck /> Accept
+                        </button>
+
+                        <button
+                          type="button"
+                          disabled={submittingAction}
+                          onClick={() => {
+                            setRescheduleModalReq(req);
+                            setRescheduleReason("");
+                          }}
+                          className="btn btn-secondary"
+                          style={{ padding: "0.5rem 0.85rem", fontSize: "0.82rem", display: "inline-flex", alignItems: "center", gap: "0.35rem" }}
+                        >
+                          <FiClock /> Reschedule
+                        </button>
+
+                        <button
+                          type="button"
+                          disabled={submittingAction}
+                          onClick={() => {
+                            setDeclineModalReq(req);
+                            setDeclineReason("");
+                          }}
+                          className="btn btn-outline"
+                          style={{ padding: "0.5rem 0.85rem", fontSize: "0.82rem", color: "#EF4444", borderColor: "rgba(239, 68, 68, 0.4)", display: "inline-flex", alignItems: "center", gap: "0.35rem" }}
+                        >
+                          <FiX /> Decline
+                        </button>
+                      </>
+                    )}
+
+                    {/* Accepted: Direct to Schedule page */}
+                    {isAccepted && (
+                      <button
+                        type="button"
+                        onClick={() => navigate("/recruiter/schedule")}
+                        className="btn btn-primary"
+                        style={{
+                          padding: "0.5rem 1rem",
+                          fontSize: "0.82rem",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "0.4rem",
+                          background: "var(--gradient-primary)",
+                        }}
+                      >
+                        <FiCalendar /> Go to Schedule <FiArrowRight />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {/* Candidate Profile Details Modal */}
+        {profileModalReq && (
+          <CandidateDetailsModal
+            candidate={profileModalReq.student || { id: getStudentId(profileModalReq), full_name: getCandidateName(profileModalReq), email: getCandidateEmail(profileModalReq) }}
+            request={profileModalReq}
+            onClose={() => setProfileModalReq(null)}
+          />
+        )}
+
+        {/* Decline Request Modal */}
+        {declineModalReq && (
           <div
-            role="dialog"
-            aria-modal="true"
             style={{
               position: "fixed",
               inset: 0,
-              zIndex: 1100,
-              background: "rgba(15, 23, 42, 0.65)",
+              zIndex: 1200,
+              background: "rgba(0, 0, 0, 0.75)",
+              backdropFilter: "blur(6px)",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
               padding: "1rem",
             }}
           >
-            <div
+            <form
+              onSubmit={handleConfirmDecline}
               className="glass-card"
               style={{
                 width: "100%",
-                maxWidth: 520,
-                padding: "1.5rem",
-                background: "#ffffff",
-                borderRadius: 16,
+                maxWidth: 450,
+                padding: "1.75rem",
+                borderRadius: "var(--radius-xl)",
+                background: "var(--color-surface)",
               }}
             >
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  gap: "1rem",
-                }}
-              >
-                <h2
-                  style={{
-                    margin: 0,
-                    color: "#0f172a",
-                  }}
-                >
-                  Candidate Details
-                </h2>
-
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
+                <h3 style={{ margin: 0, fontSize: "1.15rem", fontWeight: 800, color: "#EF4444", display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                  <FiAlertCircle /> Decline Interview Request
+                </h3>
                 <button
                   type="button"
-                  onClick={() =>
-                    setSelectedCandidate(null)
-                  }
-                  style={{
-                    border: "none",
-                    background: "transparent",
-                    cursor: "pointer",
-                    fontSize: "1.2rem",
-                  }}
+                  onClick={() => setDeclineModalReq(null)}
+                  style={{ border: "none", background: "none", color: "var(--color-muted)", cursor: "pointer", fontSize: "1.2rem" }}
                 >
                   <FiX />
                 </button>
               </div>
 
-              <div
+              <p style={{ fontSize: "0.86rem", color: "var(--color-muted)", margin: "0 0 1rem" }}>
+                Are you sure you want to decline the interview request from <strong>{getCandidateName(declineModalReq)}</strong>?
+              </p>
+
+              <label style={{ display: "block", fontSize: "0.84rem", fontWeight: 700, marginBottom: "0.4rem", color: "var(--color-text)" }}>
+                Reason (Optional, sent to student):
+              </label>
+              <textarea
+                value={declineReason}
+                onChange={(e) => setDeclineReason(e.target.value)}
+                placeholder="e.g. Current slot unavailable, please apply for next cohort."
+                rows={3}
                 style={{
-                  marginTop: "1rem",
-                  color: "#475569",
-                  lineHeight: 1.7,
-                  fontSize: "0.9rem",
+                  width: "100%",
+                  padding: "0.65rem",
+                  borderRadius: "var(--radius-md)",
+                  border: "1px solid var(--color-border)",
+                  background: "var(--color-bg)",
+                  color: "var(--color-text)",
+                  fontSize: "0.85rem",
+                  marginBottom: "1.25rem",
+                  resize: "vertical",
                 }}
-              >
-                <p>
-                  <strong>Name:</strong>{" "}
-                  {getCandidateName(
-                    selectedCandidate
-                  )}
-                </p>
+              />
 
-                <p>
-                  <strong>Email:</strong>{" "}
-                  {getCandidateEmail(
-                    selectedCandidate
-                  ) || "Unavailable"}
-                </p>
-
-                <p>
-                  <strong>Interview type:</strong>{" "}
-                  {selectedCandidate.interview_type ||
-                    "Technical Interview"}
-                </p>
-
-                <p>
-                  <strong>Status:</strong>{" "}
-                  {getStatusDetails(
-                    getRequestStatus(
-                      selectedCandidate
-                    )
-                  ).label}
-                </p>
-
-                {isInterviewScheduled(
-                  selectedCandidate
-                ) && (
-                  <p>
-                    <strong>Scheduled:</strong>{" "}
-                    {formatDate(
-                      selectedCandidate.meeting_date
-                    )}
-                    {" · "}
-                    {formatTime(
-                      selectedCandidate.meeting_time
-                    )}
-                  </p>
-                )}
-
-                {selectedCandidate.message && (
-                  <p>
-                    <strong>Message:</strong>{" "}
-                    {selectedCandidate.message}
-                  </p>
-                )}
-              </div>
-
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "flex-end",
-                  gap: "0.75rem",
-                  marginTop: "1rem",
-                }}
-              >
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.6rem" }}>
                 <button
                   type="button"
-                  onClick={() =>
-                    setSelectedCandidate(null)
-                  }
+                  onClick={() => setDeclineModalReq(null)}
                   className="btn btn-outline"
+                  style={{ fontSize: "0.82rem" }}
                 >
-                  Close
+                  Cancel
                 </button>
-
-                {isInterviewScheduled(
-                  selectedCandidate
-                ) && (
-                  <button
-                    type="button"
-                    onClick={() =>
-                      handleJoin(selectedCandidate)
-                    }
-                    className="btn btn-primary"
-                  >
-                    <FiVideo />
-                    Join Interview
-                  </button>
-                )}
+                <button
+                  type="submit"
+                  disabled={submittingAction}
+                  className="btn"
+                  style={{ background: "#EF4444", color: "#fff", border: "none", fontSize: "0.82rem", fontWeight: 700, padding: "0.55rem 1.1rem" }}
+                >
+                  {submittingAction ? "Declining..." : "Confirm Decline"}
+                </button>
               </div>
-            </div>
+            </form>
           </div>
         )}
 
-        {schedulingCandidate && (
-          <ScheduleSessionModal
-            request={schedulingCandidate}
-            onClose={() =>
-              setSchedulingCandidate(null)
-            }
-            onScheduled={handleScheduled}
-          />
+        {/* Reschedule Request Modal */}
+        {rescheduleModalReq && (
+          <div
+            style={{
+              position: "fixed",
+              inset: 0,
+              zIndex: 1200,
+              background: "rgba(0, 0, 0, 0.75)",
+              backdropFilter: "blur(6px)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: "1rem",
+            }}
+          >
+            <form
+              onSubmit={handleConfirmReschedule}
+              className="glass-card"
+              style={{
+                width: "100%",
+                maxWidth: 480,
+                padding: "1.75rem",
+                borderRadius: "var(--radius-xl)",
+                background: "var(--color-surface)",
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
+                <h3 style={{ margin: 0, fontSize: "1.15rem", fontWeight: 800, color: "var(--color-text)", display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                  <FiClock style={{ color: "var(--color-primary)" }} /> Propose New Slot
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setRescheduleModalReq(null)}
+                  style={{ border: "none", background: "none", color: "var(--color-muted)", cursor: "pointer", fontSize: "1.2rem" }}
+                >
+                  <FiX />
+                </button>
+              </div>
+
+              <p style={{ fontSize: "0.86rem", color: "var(--color-muted)", margin: "0 0 1.2rem" }}>
+                Propose an alternative date & time for <strong>{getCandidateName(rescheduleModalReq)}</strong>.
+              </p>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem", marginBottom: "1rem" }}>
+                <div>
+                  <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 700, marginBottom: "0.35rem", color: "var(--color-text)" }}>
+                    Proposed Date
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    min={new Date().toISOString().slice(0, 10)}
+                    value={rescheduleDate}
+                    onChange={(e) => setRescheduleDate(e.target.value)}
+                    style={{
+                      width: "100%",
+                      padding: "0.6rem",
+                      borderRadius: "var(--radius-md)",
+                      border: "1px solid var(--color-border)",
+                      background: "var(--color-bg)",
+                      color: "var(--color-text)",
+                      fontSize: "0.85rem",
+                    }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 700, marginBottom: "0.35rem", color: "var(--color-text)" }}>
+                    Proposed Time
+                  </label>
+                  <input
+                    type="time"
+                    required
+                    value={rescheduleTime}
+                    onChange={(e) => setRescheduleTime(e.target.value)}
+                    style={{
+                      width: "100%",
+                      padding: "0.6rem",
+                      borderRadius: "var(--radius-md)",
+                      border: "1px solid var(--color-border)",
+                      background: "var(--color-bg)",
+                      color: "var(--color-text)",
+                      fontSize: "0.85rem",
+                    }}
+                  />
+                </div>
+              </div>
+
+              <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 700, marginBottom: "0.35rem", color: "var(--color-text)" }}>
+                Reason / Note for Student:
+              </label>
+              <textarea
+                value={rescheduleReason}
+                onChange={(e) => setRescheduleReason(e.target.value)}
+                placeholder="e.g. Let's meet at this time for our technical discussion."
+                rows={3}
+                style={{
+                  width: "100%",
+                  padding: "0.6rem",
+                  borderRadius: "var(--radius-md)",
+                  border: "1px solid var(--color-border)",
+                  background: "var(--color-bg)",
+                  color: "var(--color-text)",
+                  fontSize: "0.85rem",
+                  marginBottom: "1.25rem",
+                  resize: "vertical",
+                }}
+              />
+
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.6rem" }}>
+                <button
+                  type="button"
+                  onClick={() => setRescheduleModalReq(null)}
+                  className="btn btn-outline"
+                  style={{ fontSize: "0.82rem" }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submittingAction}
+                  className="btn btn-primary"
+                  style={{ fontSize: "0.82rem", padding: "0.55rem 1.1rem" }}
+                >
+                  {submittingAction ? "Sending..." : "Send Proposal"}
+                </button>
+              </div>
+            </form>
+          </div>
         )}
-      </main>
+      </div>
     </DashboardLayout>
   );
 };

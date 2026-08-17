@@ -116,6 +116,10 @@ const ZoomMeeting = lazy(() =>
   import('./components/Meeting/ZoomMeetingRoom.jsx')
 );
 
+const LiveInterviewPortal = lazy(() =>
+  import('./pages/Student/LiveInterviewPortal.jsx')
+);
+
 const StudentInterviewHistory = lazy(() =>
   import('./pages/Student/InterviewHistory')
 );
@@ -197,7 +201,7 @@ const RecruiterVerification = lazy(() =>
 );
 
 const StudentVerification = lazy(() =>
-  import('./pages/Admin/StudentVerification')
+  import('./pages/Admin/UserManagement')
 );
 
 const UserManagement = lazy(() =>
@@ -500,28 +504,22 @@ const App = () => {
                     }
                   />
 
-                  {/* <Route
-                    path="/student/live-interview/:requestId"
-                    element={
-                      <ProtectedRoute allowedRoles={['student']}>
-                        <ZoomMeeting />
-                      </ProtectedRoute>
-                    }
-                  /> */}
                   <Route
                     path="/student/live-interview"
                     element={
                       <ProtectedRoute allowedRoles={['student']}>
-                        <StudentLiveInterviewRoom />
+                        <LiveInterviewPortal />
                       </ProtectedRoute>
                     }
                   />
-
                   <Route
-    path="/student/live-interview/:requestId"
-    element={<ZoomMeeting />}
-/>
-
+                    path="/student/live-interview/:requestId"
+                    element={
+                      <ProtectedRoute allowedRoles={['student']}>
+                        <LiveInterviewPortal />
+                      </ProtectedRoute>
+                    }
+                  />
 
                   <Route
                     path="/student/interview-history"
@@ -822,6 +820,15 @@ const App = () => {
 
                   <Route
                     path="/admin/recruiter-verification"
+                    element={
+                      <ProtectedRoute allowedRoles={['admin']}>
+                        <RecruiterVerification />
+                      </ProtectedRoute>
+                    }
+                  />
+
+                  <Route
+                    path="/admin/recruiters"
                     element={
                       <ProtectedRoute allowedRoles={['admin']}>
                         <RecruiterVerification />

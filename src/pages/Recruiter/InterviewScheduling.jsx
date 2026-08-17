@@ -1,24 +1,8 @@
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
-
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  FiAlertCircle,
-  FiCalendar,
-  FiCheck,
-  FiClock,
-  FiLoader,
-  FiMessageSquare,
-  FiPlus,
-  FiRefreshCw,
-  FiStar,
-  FiVideo,
-  FiX,
+  FiAlertCircle, FiCalendar, FiCheck, FiCheckCircle, FiClock,
+  FiLoader, FiMessageSquare, FiRefreshCw, FiStar, FiVideo, FiX, FiLink, FiCopy, FiArrowRight
 } from "react-icons/fi";
-
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 
@@ -26,10 +10,13 @@ import DashboardLayout from "../../components/Dashboard/DashboardLayout";
 import recruiterService from "../../services/recruiterService";
 import interviewService from "../../services/interviewService";
 import useRealtime from "../../hooks/useRealtime";
-
 import {
   getInterviewSessionPath,
   isInterviewScheduled,
+  formatInterviewDate,
+  formatInterviewTime,
+  formatTimeWindow,
+  getSessionTimeStatus,
 } from "../../utils/interviewSession";
 
 const getCandidateName = (item = {}) => {
@@ -38,420 +25,130 @@ const getCandidateName = (item = {}) => {
     item.student_name ||
     item.student?.full_name ||
     item.student?.name ||
-    `Candidate ${
-      item.student_id?.slice(0, 6) || ""
-    }`
+    `Candidate ${item.student_id?.slice(0, 6) || ""}`
   );
 };
 
-const getStatusStyle = (status) => {
-  switch (status) {
-    case "accepted":
-      return {
-        bg: "#e6f9f4",
-        color: "#149174",
-        label: "Accepted",
-      };
-
-    case "pending":
-      return {
-        bg: "#fef3e0",
-        color: "#b8860b",
-        label: "Pending",
-      };
-
-    case "completed":
-      return {
-        bg: "#e0f2fe",
-        color: "#0284c7",
-        label: "Completed",
-      };
-
-    case "rejected":
-      return {
-        bg: "#fef2f2",
-        color: "#ef4444",
-        label: "Declined",
-      };
-
-    case "rescheduled":
-    case "reschedule_requested":
-      return {
-        bg: "#ede9fe",
-        color: "#7c3aed",
-        label: "Reschedule Proposed",
-      };
-
-    case "reschedule_accepted":
-      return {
-        bg: "#e0f2fe",
-        color: "#0369a1",
-        label: "Reschedule Accepted",
-      };
-
-    case "waiting_recruiter_confirmation":
-      return {
-        bg: "#fef3e0",
-        color: "#b8860b",
-        label: "Pending Confirmation",
-      };
-
-    case "cancelled":
-      return {
-        bg: "#fef2f2",
-        color: "#ef4444",
-        label: "Cancelled",
-      };
-
-    default:
-      return {
-        bg: "#f1f5f9",
-        color: "#64748b",
-        label: status || "Unknown",
-      };
-  }
-};
-
-const getInterviewDate = (item = {}) => {
-  if (item.meeting_date) {
-    const date = new Date(
-      `${item.meeting_date}T00:00:00`
-    );
-
-    if (!Number.isNaN(date.getTime())) {
-      return date.toLocaleDateString(
-        "en-IN",
-        {
-          day: "numeric",
-          month: "short",
-          year: "numeric",
-        }
-      );
-    }
-
-    return item.meeting_date;
-  }
-
-  if (item.preferred_datetime) {
-    const date = new Date(
-      item.preferred_datetime
-    );
-
-    if (!Number.isNaN(date.getTime())) {
-      return date.toLocaleDateString(
-        "en-IN"
-      );
-    }
-  }
-
-  return "TBD";
-};
-
-const getInterviewTime = (item = {}) => {
-  if (item.meeting_time) {
-    const [hours, minutes] = String(
-      item.meeting_time
-    )
-      .split(":")
-      .map(Number);
-
-    if (
-      !Number.isNaN(hours) &&
-      !Number.isNaN(minutes)
-    ) {
-      const date = new Date();
-
-      date.setHours(hours);
-      date.setMinutes(minutes);
-      date.setSeconds(0);
-
-      return date.toLocaleTimeString(
-        "en-IN",
-        {
-          hour: "numeric",
-          minute: "2-digit",
-        }
-      );
-    }
-
-    return item.meeting_time;
-  }
-
-  if (item.preferred_datetime) {
-    const date = new Date(
-      item.preferred_datetime
-    );
-
-    if (!Number.isNaN(date.getTime())) {
-      return date.toLocaleTimeString(
-        "en-IN",
-        {
-          hour: "numeric",
-          minute: "2-digit",
-        }
-      );
-    }
-  }
-
-  return "TBD";
-};
-
-const needsScheduling = (item = {}) => {
-  const status = String(
-    item.status || ""
-  ).toLowerCase();
-
+const getCandidateEmail = (item = {}) => {
   return (
-    (
-      status === "accepted" ||
-      status === "reschedule_accepted" ||
-      status ===
-        "waiting_recruiter_confirmation" ||
-      status === "reschedule_requested"
-    ) &&
-    !isInterviewScheduled(item)
+    item.candidate_email ||
+    item.student_email ||
+    item.student?.email ||
+    ""
   );
 };
 
 export const InterviewScheduling = () => {
   const navigate = useNavigate();
+  const [requests, setRequests] = useState([]);
+  const [tab, setTab] = useState("Scheduled");
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [completingId, setCompletingId] = useState(null);
 
-  const [requests, setRequests] =
-    useState([]);
+  // Recruiter feedback modal
+  const [feedbackModal, setFeedbackModal] = useState(null);
+  const [feedbackRating, setFeedbackRating] = useState(5);
+  const [feedbackComment, setFeedbackComment] = useState("");
+  const [submittingFeedback, setSubmittingFeedback] = useState(false);
 
-  const [tab, setTab] =
-    useState("Upcoming");
+  const fetchInterviews = useCallback(async (isRefresh = false) => {
+    if (isRefresh) setRefreshing(true);
+    else setLoading(true);
 
-  const [loading, setLoading] =
-    useState(true);
-
-  const [error, setError] =
-    useState(null);
-
-  const [feedbackModal, setFeedbackModal] =
-    useState(null);
-
-  const [feedbackRating, setFeedbackRating] =
-    useState(5);
-
-  const [feedbackComment, setFeedbackComment] =
-    useState("");
-
-  const [submittingFeedback, setSubmittingFeedback] =
-    useState(false);
-
-  const fetchInterviews = useCallback(
-    async () => {
-      setLoading(true);
-      setError(null);
-
-      try {
-        const data =
-          await recruiterService.getInterviewRequestsForRecruiter();
-
-        setRequests(
-          Array.isArray(data) ? data : []
-        );
-      } catch (fetchError) {
-        console.error(
-          "Error loading interviews:",
-          fetchError
-        );
-
-        setError(
-          "Failed to load interviews. Please try again."
-        );
-      } finally {
-        setLoading(false);
-      }
-    },
-    []
-  );
+    try {
+      const data = await recruiterService.getInterviewRequestsForRecruiter();
+      setRequests(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error("Error loading interviews:", err);
+      toast.error("Failed to load interview sessions.");
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
 
   useEffect(() => {
     fetchInterviews();
   }, [fetchInterviews]);
 
-  useRealtime(
-    [
-      "interview_requests",
-      "interview_feedback",
-      "notifications",
-    ],
-    fetchInterviews
+  useRealtime(["interview_requests", "interview_feedback", "notifications"], () =>
+    fetchInterviews(true)
   );
 
-  const upcomingInterviews = useMemo(() => {
-    return requests.filter((request) => {
-      const status = String(
-        request.status || ""
-      ).toLowerCase();
-
-      return (
-        status === "pending" ||
-        status === "accepted" ||
-        status === "rescheduled" ||
-        status === "reschedule_requested" ||
-        status === "reschedule_accepted" ||
-        status ===
-          "waiting_recruiter_confirmation"
-      );
+  // Scheduled / Active interviews
+  const scheduledInterviews = useMemo(() => {
+    return requests.filter((r) => {
+      const status = String(r.status || "").toLowerCase();
+      const isScheduled = Boolean(r.meeting_date && (r.meeting_time || r.start_time));
+      return (status === "accepted" || status === "scheduled") && isScheduled;
     });
   }, [requests]);
 
+  // Completed interviews
   const completedInterviews = useMemo(() => {
-    return requests.filter((request) => {
-      const status = String(
-        request.status || ""
-      ).toLowerCase();
-
-      return (
-        status === "completed" ||
-        status === "rejected" ||
-        status === "cancelled"
-      );
+    return requests.filter((r) => {
+      const status = String(r.status || "").toLowerCase();
+      return status === "completed";
     });
   }, [requests]);
 
-  const displayList =
-    tab === "Upcoming"
-      ? upcomingInterviews
-      : completedInterviews;
+  const displayList = tab === "Scheduled" ? scheduledInterviews : completedInterviews;
 
-  const handleCompleteInterview = async (
-    request
-  ) => {
-    if (!isInterviewScheduled(request)) {
-      toast.error(
-        "Only a fully scheduled session can be completed."
-      );
-      return;
-    }
-
+  // Complete Interview
+  const handleCompleteInterview = async (session) => {
     const confirmed = window.confirm(
-      "Mark this interview as completed?"
+      `Mark interview with ${getCandidateName(session)} as completed? This will finalize the session and record earnings.`
     );
-
-    if (!confirmed) {
-      return;
-    }
+    if (!confirmed) return;
 
     try {
-      await interviewService.completeInterview(
-        request.id
-      );
-
-      toast.success(
-        "Interview marked as completed!"
-      );
-
-      fetchInterviews();
-    } catch (completeError) {
-      console.error(
-        "Failed to complete interview:",
-        completeError
-      );
-
-      toast.error(
-        "Failed to mark interview as completed."
-      );
-    }
-  };
-
-  const openFeedbackModal = (item) => {
-    setFeedbackModal(item);
-    setFeedbackRating(5);
-    setFeedbackComment("");
-  };
-
-  const closeFeedbackModal = () => {
-    if (submittingFeedback) {
-      return;
-    }
-
-    setFeedbackModal(null);
-    setFeedbackRating(5);
-    setFeedbackComment("");
-  };
-
-  const handleSubmitFeedback = async (
-    event
-  ) => {
-    event.preventDefault();
-
-    if (!feedbackModal) {
-      return;
-    }
-
-    setSubmittingFeedback(true);
-
-    try {
-      await recruiterService.submitInterviewFeedback(
-        {
-          interview_request_id:
-            feedbackModal.id,
-
-          student_id:
-            feedbackModal.student_id,
-
-          recruiter_user_id:
-            feedbackModal.recruiter_user_id,
-
-          rating: feedbackRating,
-
-          comments: feedbackComment,
-
-          candidate_name:
-            feedbackModal.candidate_name ||
-            feedbackModal.student_name ||
-            "Candidate",
-        }
-      );
-
-      toast.success(
-        "Feedback submitted successfully!"
-      );
-
-      closeFeedbackModal();
-      fetchInterviews();
-    } catch (feedbackError) {
-      console.error(
-        "Failed to submit feedback:",
-        feedbackError
-      );
-
-      toast.error(
-        feedbackError?.message ||
-          "Failed to submit feedback."
-      );
+      setCompletingId(session.id);
+      await interviewService.completeInterview(session.id);
+      toast.success("Interview session marked as completed!");
+      fetchInterviews(true);
+    } catch (err) {
+      console.error("Failed to complete interview:", err);
+      toast.error("Failed to mark interview as completed.");
     } finally {
-      setSubmittingFeedback(false);
+      setCompletingId(null);
     }
   };
 
-  const handleJoin = (item) => {
-    if (!isInterviewScheduled(item)) {
-      toast.error(
-        "The final date, time, and meeting room are not assigned yet."
-      );
+  const handleCopyLink = (link) => {
+    if (!link) return;
+    const fullLink = link.startsWith("http") ? link : `${window.location.origin}${link}`;
+    navigator.clipboard.writeText(fullLink);
+    toast.success("Meeting link copied to clipboard!");
+  };
+
+  const handleJoinSession = (session) => {
+    const timeStatus = getSessionTimeStatus(session);
+    if (!timeStatus.canJoin) {
+      if (timeStatus.isEnded) {
+        toast.error("This interview session has ended and is no longer accessible.");
+      } else {
+        toast.error(`Session is not active yet. Scheduled for ${formatTimeWindow(session)}.`);
+      }
       return;
     }
 
-    navigate(
-      getInterviewSessionPath(item.id)
-    );
+    if (session.meeting_link && session.meeting_link.startsWith("http")) {
+      window.open(session.meeting_link, "_blank");
+    } else {
+      navigate(getInterviewSessionPath(session.id));
+    }
   };
 
   return (
-    <DashboardLayout title="Interview Scheduling & Management">
-      <div
-        className="glass-card mb-4"
-        style={{
-          padding: "1.25rem",
-        }}
-      >
+    <DashboardLayout title="Live Interviews Studio">
+      <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem", width: "100%" }}>
+        
+        {/* Header Banner */}
         <div
+          className="glass-card"
           style={{
+            padding: "1.25rem 1.5rem",
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
@@ -459,755 +156,301 @@ export const InterviewScheduling = () => {
             gap: "1rem",
           }}
         >
-          <div
-            style={{
-              display: "flex",
-              gap: "0.5rem",
-            }}
-          >
-            {["Upcoming", "Completed"].map(
-              (tabName) => (
-                <button
-                  key={tabName}
-                  type="button"
-                  onClick={() =>
-                    setTab(tabName)
-                  }
-                  style={{
-                    padding: "0.5rem 1.1rem",
-                    borderRadius: "8px",
-                    border:
-                      tab === tabName
-                        ? "1px solid #1abc9c"
-                        : "1px solid #e2e8f0",
-                    background:
-                      tab === tabName
-                        ? "#1abc9c"
-                        : "transparent",
-                    color:
-                      tab === tabName
-                        ? "#fff"
-                        : "#475569",
-                    fontWeight: 600,
-                    fontSize: "0.85rem",
-                    cursor: "pointer",
-                  }}
-                >
-                  {tabName} Interviews
-
-                  {tabName === "Upcoming" &&
-                    upcomingInterviews.length >
-                      0 && (
-                      <span
-                        style={{
-                          marginLeft: 6,
-                          background: "#ef4444",
-                          color: "#fff",
-                          borderRadius: "50%",
-                          padding: "1px 6px",
-                          fontSize: "0.72rem",
-                          fontWeight: 700,
-                        }}
-                      >
-                        {
-                          upcomingInterviews.length
-                        }
-                      </span>
-                    )}
-                </button>
-              )
-            )}
+          <div>
+            <h1 style={{ margin: 0, fontSize: "1.35rem", fontWeight: 800, color: "var(--color-text)" }}>
+              Recruiter Live Interviews
+            </h1>
+            <p style={{ margin: "0.25rem 0 0", color: "var(--color-muted)", fontSize: "0.85rem" }}>
+              Join scheduled interview rooms during active time windows, monitor student feedback, and mark sessions complete.
+            </p>
           </div>
 
-          <div
-            style={{
-              display: "flex",
-              gap: "0.75rem",
-              alignItems: "center",
-            }}
-          >
+          <div style={{ display: "flex", gap: "0.6rem" }}>
             <button
-              type="button"
-              onClick={fetchInterviews}
-              className="btn-secondary"
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "0.4rem",
-                padding: "0.45rem 0.85rem",
-                fontSize: "0.82rem",
-              }}
+              onClick={() => fetchInterviews(true)}
+              className="btn btn-secondary"
+              style={{ display: "inline-flex", alignItems: "center", gap: "0.4rem", fontSize: "0.82rem" }}
             >
-              <FiRefreshCw
-                className={
-                  loading
-                    ? "spin-animation"
-                    : ""
-                }
-              />
-              Refresh
+              <FiRefreshCw className={refreshing ? "spin-animation" : ""} /> Refresh
             </button>
-
             <button
-              type="button"
-              onClick={() =>
-                navigate(
-                  "/recruiter/notifications"
-                )
-              }
-              className="btn btn-primary"
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "0.4rem",
-              }}
+              onClick={() => navigate("/recruiter/schedule")}
+              className="btn btn-outline"
+              style={{ display: "inline-flex", alignItems: "center", gap: "0.4rem", fontSize: "0.82rem" }}
             >
-              <FiPlus />
-              View All Requests
+              <FiCalendar /> View Calendar
             </button>
           </div>
         </div>
-      </div>
 
-      <div
-        className="glass-card"
-        style={{
-          padding: "1.5rem",
-        }}
-      >
+        {/* Tab Navigation */}
         <div
+          className="glass-card"
           style={{
+            padding: "0.85rem 1.25rem",
             display: "flex",
-            justifyContent: "space-between",
             alignItems: "center",
-            marginBottom: "1.25rem",
-            gap: "1rem",
+            justifyContent: "space-between",
             flexWrap: "wrap",
+            gap: "0.75rem",
           }}
         >
-          <h3
-            style={{
-              fontSize: "1.1rem",
-              fontWeight: 700,
-              margin: 0,
-            }}
-          >
-            {tab === "Upcoming"
-              ? "📅 Scheduled & Upcoming Interviews"
-              : "✅ Past Interview Sessions"}
-
-            <span
-              style={{
-                marginLeft: 8,
-                fontSize: "0.85rem",
-                color: "var(--color-muted)",
-                fontWeight: 500,
-              }}
-            >
-              ({displayList.length})
-            </span>
-          </h3>
-
-          <span
-            style={{
-              fontSize: "0.78rem",
-              color: "var(--color-primary)",
-              fontWeight: 600,
-            }}
-          >
-            Realtime Supabase Sync
-          </span>
-        </div>
-
-        {loading ? (
-          <div
-            style={{
-              padding: "3rem",
-              textAlign: "center",
-              color: "var(--color-muted)",
-            }}
-          >
-            <FiLoader
-              className="spin-animation"
-              style={{
-                fontSize: "2rem",
-                marginBottom: "0.75rem",
-                color: "var(--color-primary)",
-              }}
-            />
-
-            <p
-              style={{
-                fontSize: "0.85rem",
-                margin: 0,
-              }}
-            >
-              Loading interviews from Supabase...
-            </p>
-          </div>
-        ) : error ? (
-          <div
-            style={{
-              padding: "2rem",
-              textAlign: "center",
-              color: "#EF4444",
-            }}
-          >
-            <FiAlertCircle
-              style={{
-                fontSize: "2rem",
-                marginBottom: "0.5rem",
-              }}
-            />
-
-            <p
-              style={{
-                margin: "0 0 1rem",
-              }}
-            >
-              {error}
-            </p>
-
+          <div style={{ display: "flex", gap: "0.5rem" }}>
             <button
-              type="button"
-              onClick={fetchInterviews}
-              className="btn-primary"
+              onClick={() => setTab("Scheduled")}
               style={{
                 padding: "0.45rem 1rem",
+                borderRadius: "var(--radius-md)",
+                border: tab === "Scheduled" ? "1px solid var(--color-primary)" : "1px solid var(--color-border)",
+                background: tab === "Scheduled" ? "var(--color-primary)" : "transparent",
+                color: tab === "Scheduled" ? "#ffffff" : "var(--color-muted)",
+                fontWeight: 700,
                 fontSize: "0.82rem",
+                cursor: "pointer",
+                transition: "all var(--transition-fast)",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "0.4rem",
               }}
             >
-              Retry
+              <FiClock /> Scheduled Sessions ({scheduledInterviews.length})
+            </button>
+
+            <button
+              onClick={() => setTab("Completed")}
+              style={{
+                padding: "0.45rem 1rem",
+                borderRadius: "var(--radius-md)",
+                border: tab === "Completed" ? "1px solid var(--color-primary)" : "1px solid var(--color-border)",
+                background: tab === "Completed" ? "var(--color-primary)" : "transparent",
+                color: tab === "Completed" ? "#ffffff" : "var(--color-muted)",
+                fontWeight: 700,
+                fontSize: "0.82rem",
+                cursor: "pointer",
+                transition: "all var(--transition-fast)",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "0.4rem",
+              }}
+            >
+              <FiCheckCircle /> Completed &amp; Feedback ({completedInterviews.length})
             </button>
           </div>
-        ) : displayList.length === 0 ? (
-          <div
-            style={{
-              padding: "3rem",
-              textAlign: "center",
-              color: "var(--color-muted)",
-              fontSize: "0.9rem",
-            }}
-          >
-            <FiCalendar
-              style={{
-                fontSize: "2.5rem",
-                opacity: 0.4,
-                marginBottom: "0.75rem",
-              }}
-            />
+        </div>
 
-            <div
-              style={{
-                fontWeight: 700,
-              }}
-            >
-              No {tab.toLowerCase()} interviews
-              found.
+        {/* Sessions List */}
+        <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+          {loading ? (
+            <div className="glass-card" style={{ padding: "3.5rem", textAlign: "center", color: "var(--color-muted)" }}>
+              <FiLoader className="spin-animation" style={{ fontSize: "2rem", marginBottom: "0.6rem" }} />
+              <div>Loading interview sessions...</div>
             </div>
-
-            <div
-              style={{
-                fontSize: "0.82rem",
-                marginTop: "0.25rem",
-              }}
-            >
-              {tab === "Upcoming"
-                ? "New requests will appear here when students book interviews."
-                : "Completed sessions will be archived here."}
+          ) : displayList.length === 0 ? (
+            <div className="glass-card" style={{ padding: "3.5rem", textAlign: "center", color: "var(--color-muted)" }}>
+              <FiVideo size={42} style={{ opacity: 0.35, marginBottom: "0.75rem" }} />
+              <h3 style={{ margin: 0, color: "var(--color-text)", fontSize: "1.05rem" }}>
+                {tab === "Scheduled" ? "No upcoming scheduled interviews" : "No completed interviews yet"}
+              </h3>
+              <p style={{ margin: "0.3rem 0 0", fontSize: "0.85rem", color: "var(--color-muted)" }}>
+                {tab === "Scheduled"
+                  ? "Assign slots to accepted candidates in the Schedule page to see sessions here."
+                  : "Completed technical drills and student feedback reviews will appear here."}
+              </p>
+              {tab === "Scheduled" && (
+                <button
+                  onClick={() => navigate("/recruiter/schedule")}
+                  className="btn btn-primary"
+                  style={{ marginTop: "1rem", display: "inline-flex", alignItems: "center", gap: "0.4rem", fontSize: "0.84rem" }}
+                >
+                  <FiCalendar /> Go to Schedule Hub
+                </button>
+              )}
             </div>
-          </div>
-        ) : (
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              gap: "0.85rem",
-            }}
-          >
-            {displayList.map((item) => {
-              const statusStyle =
-                getStatusStyle(item.status);
-
-              const candidateName =
-                getCandidateName(item);
-
-              const interviewDate =
-                getInterviewDate(item);
-
-              const interviewTime =
-                getInterviewTime(item);
-
-              const scheduled =
-                isInterviewScheduled(item);
+          ) : (
+            displayList.map((session) => {
+              const name = getCandidateName(session);
+              const email = getCandidateEmail(session);
+              const timeStatus = getSessionTimeStatus(session);
+              const isCompleted = session.status === "completed";
 
               return (
                 <div
-                  key={item.id}
+                  key={session.id}
+                  className="glass-card"
                   style={{
+                    padding: "1.25rem 1.5rem",
+                    borderRadius: "var(--radius-xl)",
                     display: "flex",
                     alignItems: "center",
-                    gap: "1.25rem",
-                    padding: "1rem 1.25rem",
-                    borderRadius: "10px",
-                    background:
-                      "rgba(255,255,255,0.04)",
-                    border:
-                      "1px solid rgba(255,255,255,0.1)",
+                    justifyContent: "space-between",
                     flexWrap: "wrap",
+                    gap: "1.25rem",
+                    border: timeStatus.canJoin ? "1px solid rgba(16, 185, 129, 0.5)" : "1px solid var(--color-border)",
+                    boxShadow: timeStatus.canJoin ? "0 0 20px rgba(16, 185, 129, 0.12)" : "var(--shadow-sm)",
+                    transition: "all var(--transition-fast)",
                   }}
                 >
-                  <img
-                    src={`https://ui-avatars.com/api/?name=${encodeURIComponent(
-                      candidateName
-                    )}&background=4f46e5&color=fff&size=80`}
-                    alt=""
-                    style={{
-                      width: 44,
-                      height: 44,
-                      borderRadius: "50%",
-                      border:
-                        "2px solid var(--color-primary)",
-                    }}
-                  />
-
-                  <div
-                    style={{
-                      flex: "1 1 200px",
-                    }}
-                  >
-                    <div
+                  {/* Left: Candidate Info */}
+                  <div style={{ display: "flex", alignItems: "center", gap: "1rem", minWidth: 260, flex: "1 1 280px" }}>
+                    <img
+                      src={
+                        session.candidate_avatar ||
+                        session.student?.avatar_url ||
+                        `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=4f46e5&color=fff&size=96`
+                      }
+                      alt={name}
                       style={{
-                        fontWeight: 700,
-                        fontSize: "0.95rem",
-                        color: "var(--color-text)",
+                        width: 54,
+                        height: 54,
+                        borderRadius: "50%",
+                        border: `2px solid ${timeStatus.canJoin ? "#10B981" : "var(--color-primary)"}`,
+                        objectFit: "cover",
+                        flexShrink: 0,
                       }}
-                    >
-                      {candidateName}
+                    />
+                    <div>
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
+                        <span style={{ fontWeight: 800, fontSize: "1.02rem", color: "var(--color-text)" }}>
+                          {name}
+                        </span>
+                        <span
+                          style={{
+                            padding: "0.2rem 0.55rem",
+                            borderRadius: "999px",
+                            background: timeStatus.bg,
+                            color: timeStatus.color,
+                            fontSize: "0.72rem",
+                            fontWeight: 800,
+                          }}
+                        >
+                          {timeStatus.label}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: "0.82rem", color: "var(--color-muted)", marginTop: "0.15rem" }}>
+                        {email || "Candidate"}
+                      </div>
+                      <div style={{ fontSize: "0.76rem", fontWeight: 700, color: "var(--color-primary)", marginTop: "0.25rem" }}>
+                        {session.interview_type || "Technical Deep Dive"}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Middle: Schedule Window & Link */}
+                  <div style={{ flex: "2 1 300px", minWidth: 240 }}>
+                    <div style={{ fontSize: "0.84rem", color: "var(--color-text)", fontWeight: 700, display: "flex", alignItems: "center", gap: "0.45rem", marginBottom: "0.3rem" }}>
+                      <FiCalendar style={{ color: "var(--color-primary)" }} />
+                      {formatInterviewDate(session.meeting_date)}
+                    </div>
+                    <div style={{ fontSize: "0.82rem", color: "var(--color-muted)", display: "flex", alignItems: "center", gap: "0.45rem", marginBottom: "0.4rem" }}>
+                      <FiClock style={{ color: "var(--color-primary)" }} />
+                      <strong>Time:</strong> {formatTimeWindow(session)}
                     </div>
 
-                    <div
-                      style={{
-                        fontSize: "0.82rem",
-                        color: "var(--color-primary)",
-                        fontWeight: 600,
-                      }}
-                    >
-                      {item.interview_type ||
-                        "Technical Interview"}
-                    </div>
+                    {session.meeting_link && (
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", fontSize: "0.78rem", color: "var(--color-muted)" }}>
+                        <FiLink />
+                        <span style={{ maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {session.meeting_link}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleCopyLink(session.meeting_link)}
+                          style={{ border: "none", background: "none", color: "var(--color-primary)", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "0.2rem", fontWeight: 700, fontSize: "0.76rem" }}
+                          title="Copy meeting link"
+                        >
+                          <FiCopy /> Copy
+                        </button>
+                      </div>
+                    )}
 
-                    {item.message && (
-                      <div
-                        style={{
-                          fontSize: "0.78rem",
-                          color: "var(--color-muted)",
-                          marginTop: "0.2rem",
-                          fontStyle: "italic",
-                        }}
-                      >
-                        “{item.message}”
+                    {/* Student Feedback display on completed sessions */}
+                    {isCompleted && session.feedback && (
+                      <div style={{ marginTop: "0.5rem", padding: "0.4rem 0.65rem", borderRadius: "6px", background: "rgba(245, 158, 11, 0.08)", borderLeft: "3px solid #F59E0B" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "0.25rem", fontSize: "0.8rem", color: "#F59E0B", fontWeight: 800 }}>
+                          {[1, 2, 3, 4, 5].map((s) => (
+                            <span key={s} style={{ color: s <= (session.feedback.overall_rating || 5) ? "#F59E0B" : "var(--color-border)" }}>★</span>
+                          ))}
+                          <span style={{ color: "var(--color-text)", fontSize: "0.76rem", marginLeft: 4 }}>Student Rating</span>
+                        </div>
+                        {session.feedback.comments && (
+                          <div style={{ fontSize: "0.78rem", color: "var(--color-muted)", marginTop: 2, fontStyle: "italic" }}>
+                            "{session.feedback.comments}"
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
 
-                  <div
-                    style={{
-                      minWidth: 190,
-                    }}
-                  >
-                    <div
-                      style={{
-                        fontSize: "0.75rem",
-                        color: "#94a3b8",
-                        marginBottom: "0.1rem",
-                      }}
-                    >
-                      {tab === "Upcoming"
-                        ? scheduled
-                          ? "Scheduled Time"
-                          : "Scheduling Status"
-                        : "Completed Date"}
-                    </div>
-
-                    <div
-                      style={{
-                        fontSize: "0.9rem",
-                        fontWeight: 700,
-                        color: "var(--color-text)",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "0.35rem",
-                      }}
-                    >
-                      {scheduled ? (
-                        <>
-                          <FiClock
-                            style={{
-                              opacity: 0.6,
-                            }}
-                          />
-                          {interviewDate}{" "}
-                          {interviewTime}
-                        </>
-                      ) : (
-                        "Final slot not assigned"
-                      )}
-                    </div>
-                  </div>
-
-                  <div>
-                    <span
-                      style={{
-                        fontSize: "0.75rem",
-                        padding: "4px 10px",
-                        borderRadius: "999px",
-                        background: scheduled
-                          ? "#dcfce7"
-                          : statusStyle.bg,
-                        color: scheduled
-                          ? "#166534"
-                          : statusStyle.color,
-                        fontWeight: 700,
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      {scheduled
-                        ? "Scheduled"
-                        : statusStyle.label}
-                    </span>
-                  </div>
-
-                  <div
-                    style={{
-                      display: "flex",
-                      gap: "0.5rem",
-                      flexWrap: "wrap",
-                    }}
-                  >
-                    {needsScheduling(item) && (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          navigate(
-                            "/recruiter/candidates"
-                          )
-                        }
-                        className="btn btn-outline"
-                        style={{
-                          padding: "0.4rem 0.8rem",
-                          fontSize: "0.8rem",
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "0.35rem",
-                        }}
-                      >
-                        <FiCalendar />
-                        Schedule Session
-                      </button>
-                    )}
-
-                    {scheduled && (
+                  {/* Right: Actions */}
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", flexWrap: "wrap", justifyContent: "flex-end" }}>
+                    {!isCompleted && (
                       <>
+                        {/* Time-Gated Join Button */}
                         <button
                           type="button"
-                          onClick={() =>
-                            handleJoin(item)
-                          }
+                          disabled={!timeStatus.canJoin}
+                          onClick={() => handleJoinSession(session)}
                           className="btn btn-primary"
                           style={{
-                            padding: "0.4rem 0.8rem",
-                            fontSize: "0.8rem",
-                            display: "flex",
+                            padding: "0.55rem 1.25rem",
+                            fontSize: "0.84rem",
+                            display: "inline-flex",
                             alignItems: "center",
-                            gap: "0.35rem",
+                            gap: "0.45rem",
+                            background: timeStatus.canJoin ? "linear-gradient(135deg, #10b981, #059669)" : undefined,
+                            boxShadow: timeStatus.canJoin ? "0 4px 15px rgba(16, 185, 129, 0.35)" : "none",
+                            opacity: timeStatus.canJoin ? 1 : 0.6,
+                            cursor: timeStatus.canJoin ? "pointer" : "not-allowed",
                           }}
                         >
                           <FiVideo />
-                          Join Live Room
+                          {timeStatus.isEnded ? "Session Ended" : timeStatus.canJoin ? "Join Interview" : timeStatus.label}
                         </button>
 
+                        {/* Mark Complete */}
                         <button
                           type="button"
-                          onClick={() =>
-                            handleCompleteInterview(
-                              item
-                            )
-                          }
-                          className="btn btn-outline"
+                          disabled={completingId === session.id}
+                          onClick={() => handleCompleteInterview(session)}
+                          className="btn btn-secondary"
                           style={{
-                            padding: "0.4rem 0.8rem",
-                            fontSize: "0.8rem",
-                            display: "flex",
+                            padding: "0.55rem 0.95rem",
+                            fontSize: "0.82rem",
+                            display: "inline-flex",
                             alignItems: "center",
                             gap: "0.35rem",
                           }}
                         >
-                          <FiCheck />
-                          Mark Done
+                          <FiCheckCircle />
+                          {completingId === session.id ? "Completing..." : "Complete"}
                         </button>
                       </>
                     )}
 
-                    {item.status === "completed" && (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          openFeedbackModal(item)
-                        }
-                        className="btn btn-outline"
+                    {isCompleted && (
+                      <span
                         style={{
-                          padding: "0.4rem 0.8rem",
-                          fontSize: "0.8rem",
-                          display: "flex",
+                          padding: "0.45rem 1rem",
+                          borderRadius: "var(--radius-md)",
+                          background: "rgba(59, 130, 246, 0.12)",
+                          color: "#3B82F6",
+                          fontSize: "0.82rem",
+                          fontWeight: 800,
+                          display: "inline-flex",
                           alignItems: "center",
                           gap: "0.35rem",
                         }}
                       >
-                        <FiMessageSquare />
-                        Submit Feedback
-                      </button>
-                    )}
-
-                    {item.status === "pending" && (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          navigate(
-                            "/recruiter/notifications"
-                          )
-                        }
-                        className="btn btn-outline"
-                        style={{
-                          padding: "0.4rem 0.8rem",
-                          fontSize: "0.8rem",
-                        }}
-                      >
-                        Respond to Request
-                      </button>
+                        <FiCheckCircle /> Completed
+                      </span>
                     )}
                   </div>
                 </div>
               );
-            })}
-          </div>
-        )}
-      </div>
-
-      {feedbackModal && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0,0,0,0.75)",
-            backdropFilter: "blur(8px)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 999,
-            padding: "1rem",
-          }}
-        >
-          <div
-            className="glass-card"
-            style={{
-              width: "100%",
-              maxWidth: 480,
-              padding: "1.75rem",
-            }}
-          >
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                marginBottom: "1rem",
-              }}
-            >
-              <h3
-                style={{
-                  margin: 0,
-                  fontSize: "1.15rem",
-                  fontWeight: 800,
-                }}
-              >
-                Submit Interview Feedback
-              </h3>
-
-              <button
-                type="button"
-                onClick={closeFeedbackModal}
-                disabled={submittingFeedback}
-                style={{
-                  border: "none",
-                  background: "none",
-                  color: "var(--color-text)",
-                  cursor: submittingFeedback
-                    ? "not-allowed"
-                    : "pointer",
-                  fontSize: "1.2rem",
-                }}
-              >
-                <FiX />
-              </button>
-            </div>
-
-            <p
-              style={{
-                fontSize: "0.85rem",
-                color: "var(--color-muted)",
-                marginBottom: "1rem",
-              }}
-            >
-              Rate the interview session with{" "}
-              <strong>
-                {getCandidateName(
-                  feedbackModal
-                )}
-              </strong>
-            </p>
-
-            <form
-              onSubmit={handleSubmitFeedback}
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: "1rem",
-              }}
-            >
-              <div>
-                <label
-                  style={{
-                    display: "block",
-                    fontSize: "0.84rem",
-                    fontWeight: 600,
-                    marginBottom: "0.4rem",
-                  }}
-                >
-                  Overall Rating
-                </label>
-
-                <div
-                  style={{
-                    display: "flex",
-                    gap: "0.5rem",
-                    alignItems: "center",
-                  }}
-                >
-                  {[1, 2, 3, 4, 5].map(
-                    (star) => (
-                      <button
-                        key={star}
-                        type="button"
-                        onClick={() =>
-                          setFeedbackRating(
-                            star
-                          )
-                        }
-                        style={{
-                          background: "none",
-                          border: "none",
-                          fontSize: "1.75rem",
-                          cursor: "pointer",
-                          color:
-                            star <= feedbackRating
-                              ? "#F59E0B"
-                              : "#CBD5E1",
-                          transition:
-                            "color 0.15s",
-                        }}
-                      >
-                        ★
-                      </button>
-                    )
-                  )}
-
-                  <span
-                    style={{
-                      fontSize: "0.85rem",
-                      color: "var(--color-muted)",
-                      marginLeft: "0.5rem",
-                    }}
-                  >
-                    {feedbackRating}/5
-                  </span>
-                </div>
-              </div>
-
-              <div>
-                <label
-                  htmlFor="feedback-comment"
-                  style={{
-                    display: "block",
-                    fontSize: "0.84rem",
-                    fontWeight: 600,
-                    marginBottom: "0.4rem",
-                  }}
-                >
-                  Comments / Feedback
-                </label>
-
-                <textarea
-                  id="feedback-comment"
-                  value={feedbackComment}
-                  onChange={(event) =>
-                    setFeedbackComment(
-                      event.target.value
-                    )
-                  }
-                  placeholder="Describe the candidate's technical skills, communication, and overall performance..."
-                  rows={4}
-                  className="input-field"
-                  style={{
-                    width: "100%",
-                    resize: "vertical",
-                  }}
-                />
-              </div>
-
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "flex-end",
-                  gap: "0.75rem",
-                }}
-              >
-                <button
-                  type="button"
-                  onClick={closeFeedbackModal}
-                  disabled={submittingFeedback}
-                  className="btn-secondary"
-                >
-                  Cancel
-                </button>
-
-                <button
-                  type="submit"
-                  className="btn-primary"
-                  disabled={submittingFeedback}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "0.4rem",
-                  }}
-                >
-                  {submittingFeedback ? (
-                    <FiLoader className="spin-animation" />
-                  ) : (
-                    <FiStar />
-                  )}
-
-                  {submittingFeedback
-                    ? "Submitting..."
-                    : "Submit Feedback"}
-                </button>
-              </div>
-            </form>
-          </div>
+            })
+          )}
         </div>
-      )}
+      </div>
     </DashboardLayout>
   );
 };

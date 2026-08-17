@@ -2,10 +2,10 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import '../dashboard.css';
 
-export const QuickActionCard = ({ actions = [] }) => {
+export const QuickActionCard = ({ title, actions = [] }) => {
   return (
     <div className="glass-card quick-action-card">
-      <h4 className="quick-action-title">Quick Actions</h4>
+      {title && <h4 className="quick-action-title">{title}</h4>}
 
       <div className="quick-action-grid">
         {actions.map((act, idx) => (

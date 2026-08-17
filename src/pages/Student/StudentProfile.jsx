@@ -20,6 +20,13 @@ import {
   FiBriefcase,
   FiCheckCircle,
   FiAlertCircle,
+  FiCamera,
+  FiActivity,
+  FiStar,
+  FiShield,
+  FiZap,
+  FiAward,
+  FiCheck,
 } from 'react-icons/fi';
 import { HiSparkles } from 'react-icons/hi';
 import DashboardLayout from '../../components/Dashboard/DashboardLayout';
@@ -29,9 +36,6 @@ import userService from '../../services/userService';
 import { supabase, isSupabaseConfigured } from '../../services/supabaseClient';
 import toast from 'react-hot-toast';
 import './studentProfile.css';
-
-const DEFAULT_AVATAR =
-  'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=400';
 
 const EMPTY_FORM = {
   fullName: '',
@@ -50,15 +54,11 @@ const EMPTY_FORM = {
 const normalizeUrl = (value) => {
   if (!value) return '';
   const trimmed = value.trim();
-
   if (
     trimmed.startsWith('http://') ||
     trimmed.startsWith('https://') ||
     trimmed.startsWith('mailto:')
-  ) {
-    return trimmed;
-  }
-
+  ) return trimmed;
   return `https://${trimmed}`;
 };
 
@@ -84,7 +84,6 @@ const getProfileCompletion = (formData, skills, resumeFileName) => {
     skills.length > 0,
     resumeFileName,
   ];
-
   const completed = fields.filter(Boolean).length;
   return Math.round((completed / fields.length) * 100);
 };
@@ -100,7 +99,7 @@ export const StudentProfile = () => {
   const [saving, setSaving] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [uploadingResume, setUploadingResume] = useState(false);
-  const [editMode, setEditMode] = useState(false);
+  const [activeTab, setActiveTab] = useState('Overview');
 
   const [formData, setFormData] = useState(getInitialFormData(user));
   const [skills, setSkills] = useState([]);
@@ -127,24 +126,15 @@ export const StudentProfile = () => {
   );
 
   useEffect(() => {
-    if (user?.id) {
-      fetchProfileData();
-    } else {
-      setLoading(false);
-    }
+    if (user?.id) fetchProfileData();
+    else setLoading(false);
   }, [user?.id]);
 
   const fetchProfileData = async () => {
-    if (!user?.id) {
-      setLoading(false);
-      return;
-    }
-
+    if (!user?.id) { setLoading(false); return; }
     setLoading(true);
-
     try {
       const data = await userService.getCandidateProfile(user.id);
-
       if (!data) {
         setProfileExists(false);
         setFormData(getInitialFormData(user));
@@ -154,9 +144,7 @@ export const StudentProfile = () => {
         setResumeFileUrl('');
         return;
       }
-
       setProfileExists(true);
-
       setFormData({
         fullName: data.name || '',
         username: data.username || '',
@@ -170,7 +158,6 @@ export const StudentProfile = () => {
         portfolioUrl: data.portfolio_url || '',
         website: data.website || '',
       });
-
       setSkills(Array.isArray(data.skills) ? data.skills : []);
       setPhotoPreview(data.avatar_url || data.avatar || '');
       setResumeFileName(data.resume_file_name || '');
@@ -185,160 +172,81 @@ export const StudentProfile = () => {
 
   const handleInputChange = (event) => {
     const { name, value } = event.target;
-
-    setFormData((previous) => ({
-      ...previous,
-      [name]: value,
-    }));
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleAddSkill = (event) => {
     event?.preventDefault();
-
     const skill = newSkillInput.trim();
-
     if (!skill) return;
-
-    const alreadyExists = skills.some(
-      (existingSkill) => existingSkill.toLowerCase() === skill.toLowerCase()
-    );
-
-    if (alreadyExists) {
-      toast.error('This skill has already been added');
-      return;
+    if (skills.some((s) => s.toLowerCase() === skill.toLowerCase())) {
+      toast.error('This skill has already been added'); return;
     }
-
-    setSkills((previous) => [...previous, skill]);
+    setSkills((prev) => [...prev, skill]);
     setNewSkillInput('');
   };
 
   const handleRemoveSkill = (skillToRemove) => {
-    setSkills((previous) =>
-      previous.filter((skill) => skill !== skillToRemove)
-    );
+    setSkills((prev) => prev.filter((s) => s !== skillToRemove));
   };
 
   const validateImage = (file) => {
     const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
-    const maxSize = 5 * 1024 * 1024;
-
-    if (!validTypes.includes(file.type)) {
-      toast.error('Please upload a JPG, PNG, or WEBP image');
-      return false;
-    }
-
-    if (file.size > maxSize) {
-      toast.error('Profile image must be smaller than 5MB');
-      return false;
-    }
-
+    if (!validTypes.includes(file.type)) { toast.error('Please upload a JPG, PNG, or WEBP image'); return false; }
+    if (file.size > 5 * 1024 * 1024) { toast.error('Profile image must be smaller than 5MB'); return false; }
     return true;
   };
 
   const validateResume = (file) => {
-    const validTypes = [
-      'application/pdf',
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    ];
-    const maxSize = 10 * 1024 * 1024;
-
+    const validTypes = ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
     const validExtension = /\.(pdf|docx)$/i.test(file.name);
-
-    if (!validTypes.includes(file.type) && !validExtension) {
-      toast.error('Please upload a PDF or DOCX resume');
-      return false;
-    }
-
-    if (file.size > maxSize) {
-      toast.error('Resume must be smaller than 10MB');
-      return false;
-    }
-
+    if (!validTypes.includes(file.type) && !validExtension) { toast.error('Please upload a PDF or DOCX resume'); return false; }
+    if (file.size > 10 * 1024 * 1024) { toast.error('Resume must be smaller than 10MB'); return false; }
     return true;
   };
 
   const uploadToStorage = async (bucket, file, prefix) => {
     const extension = file.name.split('.').pop()?.toLowerCase() || 'file';
     const filePath = `${user.id}/${prefix}-${Date.now()}.${extension}`;
-
-    const { error: uploadError } = await supabase.storage
-      .from(bucket)
-      .upload(filePath, file, {
-        upsert: true,
-        cacheControl: '3600',
-        contentType: file.type,
-      });
-
-    if (uploadError) {
-      throw uploadError;
-    }
-
-    const { data: publicUrlData } = supabase.storage
-      .from(bucket)
-      .getPublicUrl(filePath);
-
+    const { error: uploadError } = await supabase.storage.from(bucket).upload(filePath, file, {
+      upsert: true, cacheControl: '3600', contentType: file.type,
+    });
+    if (uploadError) throw uploadError;
+    const { data: publicUrlData } = supabase.storage.from(bucket).getPublicUrl(filePath);
     return publicUrlData?.publicUrl || '';
   };
 
   const handlePhotoUpload = async (event) => {
     const file = event.target.files?.[0];
-
-    if (!file) return;
-    if (!validateImage(file)) return;
-
+    if (!file || !validateImage(file)) return;
     const localPreview = URL.createObjectURL(file);
     setPhotoPreview(localPreview);
-
-    if (!isSupabaseConfigured() || !user?.id) {
-      toast.success('Photo preview updated');
-      return;
-    }
-
+    if (!isSupabaseConfigured() || !user?.id) { toast.success('Photo preview updated'); return; }
     setUploadingAvatar(true);
-
     try {
-      const uploadedUrl = await uploadToStorage(
-        'profile_images',
-        file,
-        'avatar'
-      );
-
+      const uploadedUrl = await uploadToStorage('profile_images', file, 'avatar');
       setPhotoPreview(uploadedUrl);
       toast.success('Profile photo uploaded');
     } catch (error) {
       console.error('Avatar upload failed:', error);
       toast.error('Photo upload failed. The preview is still available.');
-    } finally {
-      setUploadingAvatar(false);
-    }
+    } finally { setUploadingAvatar(false); }
   };
 
   const handleResumeUpload = async (event) => {
     const file = event.target.files?.[0];
-
-    if (!file) return;
-    if (!validateResume(file)) return;
-
+    if (!file || !validateResume(file)) return;
     setResumeFileName(file.name);
-
-    if (!isSupabaseConfigured() || !user?.id) {
-      toast.success('Resume selected');
-      return;
-    }
-
+    if (!isSupabaseConfigured() || !user?.id) { toast.success('Resume selected'); return; }
     setUploadingResume(true);
-
     try {
       const uploadedUrl = await uploadToStorage('resumes', file, 'resume');
-
       setResumeFileUrl(uploadedUrl);
       toast.success('Resume uploaded');
     } catch (error) {
       console.error('Resume upload failed:', error);
       toast.error('Resume upload failed. Please try again.');
-    } finally {
-      setUploadingResume(false);
-    }
+    } finally { setUploadingResume(false); }
   };
 
   const handleReset = async () => {
@@ -348,24 +256,10 @@ export const StudentProfile = () => {
 
   const handleSubmit = async (event) => {
     event.preventDefault();
-
-    if (!user?.id) {
-      toast.error('You must be logged in to save your profile');
-      return;
-    }
-
-    if (!formData.fullName.trim()) {
-      toast.error('Full name is required');
-      return;
-    }
-
-    if (!formData.email.trim()) {
-      toast.error('Email address is required');
-      return;
-    }
-
+    if (!user?.id) { toast.error('You must be logged in to save your profile'); return; }
+    if (!formData.fullName.trim()) { toast.error('Full name is required'); return; }
+    if (!formData.email.trim()) { toast.error('Email address is required'); return; }
     setSaving(true);
-
     try {
       const payload = {
         name: formData.fullName.trim(),
@@ -386,74 +280,41 @@ export const StudentProfile = () => {
         skills,
         role: 'student',
       };
-
-      const result = await userService.updateCandidateProfile(
-        user.id,
-        payload
-      );
-
+      const result = await userService.updateCandidateProfile(user.id, payload);
       const savedProfile = result?.data || result || payload;
-
       setFormData({
         fullName: savedProfile.name || payload.name || '',
         username: savedProfile.username || payload.username || '',
         email: savedProfile.email || payload.email || '',
         phone: savedProfile.phone || payload.phone || '',
         location: savedProfile.location || payload.location || '',
-        currentStatus:
-          savedProfile.current_status || payload.current_status || '',
+        currentStatus: savedProfile.current_status || payload.current_status || '',
         bio: savedProfile.bio || payload.bio || '',
         githubUrl: savedProfile.github_url || payload.github_url || '',
-        linkedinUrl:
-          savedProfile.linkedin_url || payload.linkedin_url || '',
-        portfolioUrl:
-          savedProfile.portfolio_url || payload.portfolio_url || '',
+        linkedinUrl: savedProfile.linkedin_url || payload.linkedin_url || '',
+        portfolioUrl: savedProfile.portfolio_url || payload.portfolio_url || '',
         website: savedProfile.website || payload.website || '',
       });
-
-      setSkills(
-        Array.isArray(savedProfile.skills)
-          ? savedProfile.skills
-          : payload.skills
-      );
-      setPhotoPreview(
-        savedProfile.avatar_url || payload.avatar_url || ''
-      );
-      setResumeFileName(
-        savedProfile.resume_file_name || payload.resume_file_name || ''
-      );
-      setResumeFileUrl(
-        savedProfile.resume_file_url || payload.resume_file_url || ''
-      );
+      setSkills(Array.isArray(savedProfile.skills) ? savedProfile.skills : payload.skills);
+      setPhotoPreview(savedProfile.avatar_url || payload.avatar_url || '');
+      setResumeFileName(savedProfile.resume_file_name || payload.resume_file_name || '');
+      setResumeFileUrl(savedProfile.resume_file_url || payload.resume_file_url || '');
       setProfileExists(true);
-
-      if (updateUser) {
-        updateUser({
-          ...user,
-          name: payload.name,
-          username: payload.username,
-          email: payload.email,
-          avatar: payload.avatar_url,
-          avatar_url: payload.avatar_url,
-        });
-      }
-
-      setEditMode(false);
+      if (updateUser) updateUser({ ...user, name: payload.name, username: payload.username, email: payload.email, avatar: payload.avatar_url, avatar_url: payload.avatar_url });
+      setActiveTab('Overview');
       toast.success('Profile saved successfully');
     } catch (error) {
       console.error('Profile update failed:', error);
       toast.error(error?.message || 'Failed to save profile');
-    } finally {
-      setSaving(false);
-    }
+    } finally { setSaving(false); }
   };
 
   if (loading) {
     return (
       <DashboardLayout title="My Profile">
-        <div className="profile-loading">
-          <FiLoader className="spin-animation" />
-          <p>Loading profile...</p>
+        <div className="sp-loading">
+          <div className="sp-loading-spinner"><FiLoader /></div>
+          <p>Loading your profile...</p>
         </div>
       </DashboardLayout>
     );
@@ -462,7 +323,7 @@ export const StudentProfile = () => {
   if (!user?.id) {
     return (
       <DashboardLayout title="My Profile">
-        <div className="profile-empty-state">
+        <div className="sp-empty-state">
           <FiAlertCircle />
           <h2>Authentication required</h2>
           <p>Please sign in to view and edit your profile.</p>
@@ -470,6 +331,8 @@ export const StudentProfile = () => {
       </DashboardLayout>
     );
   }
+
+  const completionColor = profileCompletion >= 80 ? '#059669' : profileCompletion >= 50 ? '#d97706' : '#dc2626';
 
   return (
     <DashboardLayout title="My Profile">
@@ -823,72 +686,21 @@ export const StudentProfile = () => {
                 <p>Update your information and save it to your profile.</p>
               </div>
 
-              <span className="sync-badge">
-                <span />
-                Supabase profile sync
-              </span>
+              <button
+                type="button"
+                className="close-editor-btn"
+                onClick={() => setEditMode(false)}
+                aria-label="Close editor"
+              >
+                <FiX />
+              </button>
             </div>
 
-            <form className="profile-form" onSubmit={handleSubmit}>
-              <div className="upload-grid">
-                <div className="upload-card">
-                  <div className="upload-icon">
-                    <FiUploadCloud />
-                  </div>
-                  <div>
-                    <h3>Profile photo</h3>
-                    <p>JPG, PNG, or WEBP. Maximum 5MB.</p>
-                  </div>
-                  <button
-                    type="button"
-                    className="upload-button"
-                    onClick={() => photoInputRef.current?.click()}
-                    disabled={uploadingAvatar}
-                  >
-                    {uploadingAvatar ? 'Uploading...' : 'Choose photo'}
-                  </button>
-                  <input
-                    ref={photoInputRef}
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp"
-                    onChange={handlePhotoUpload}
-                    hidden
-                  />
-                </div>
-
-                <div className="upload-card">
-                  <div className="upload-icon resume-icon">
-                    <FiFileText />
-                  </div>
-                  <div>
-                    <h3>Primary resume</h3>
-                    <p>PDF or DOCX. Maximum 10MB.</p>
-                  </div>
-                  <button
-                    type="button"
-                    className="upload-button"
-                    onClick={() => resumeInputRef.current?.click()}
-                    disabled={uploadingResume}
-                  >
-                    {uploadingResume ? 'Uploading...' : 'Choose resume'}
-                  </button>
-                  <input
-                    ref={resumeInputRef}
-                    type="file"
-                    accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                    onChange={handleResumeUpload}
-                    hidden
-                  />
-                  {resumeFileName && (
-                    <span className="selected-file">{resumeFileName}</span>
-                  )}
-                </div>
-              </div>
-
+            <form onSubmit={handleSubmit} className="profile-form">
               <div className="form-section">
                 <div className="form-section-heading">
                   <h3>Basic information</h3>
-                  <p>Keep your personal information accurate.</p>
+                  <p>Your primary account and public details.</p>
                 </div>
 
                 <div className="form-grid">
@@ -1070,7 +882,7 @@ export const StudentProfile = () => {
                     value={formData.portfolioUrl}
                     onChange={handleInputChange}
                     placeholder="yourportfolio.com"
-                    icon={<FiGlobe />}
+                    icon={<FiStar />}
                   />
 
                   <FormField

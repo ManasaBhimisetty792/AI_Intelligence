@@ -378,13 +378,13 @@ function BookingModal({
 
           <div className="form-group">
             <label htmlFor="booking-message">
-              Message to Recruiter
+             Job Description
             </label>
 
             <textarea
               id="booking-message"
               name="message"
-              placeholder="Tell the recruiter what you want to focus on."
+              placeholder=" Paste Your Job Description.."
               rows={4}
               className="input-field"
               disabled={submitting}
