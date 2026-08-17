@@ -504,22 +504,18 @@ const App = () => {
                     }
                   />
 
-                  <Route
-                    path="/student/live-interview"
-                    element={
-                      <ProtectedRoute allowedRoles={['student']}>
-                        <LiveInterviewPortal />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
+                  {/* <Route
                     path="/student/live-interview/:requestId"
                     element={
                       <ProtectedRoute allowedRoles={['student']}>
-                        <LiveInterviewPortal />
+                        <ZoomMeeting />
                       </ProtectedRoute>
                     }
-                  />
+                  /> */}
+                  <Route
+    path="/student/live-interview/:requestId"
+    element={<ZoomMeeting />}
+/>
 
                   <Route
                     path="/student/interview-history"

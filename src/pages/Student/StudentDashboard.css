@@ -130,6 +130,7 @@
   padding: 1.1rem;
   border-radius: var(--radius-xl);
   background: var(--glass-bg);
+
   border: 1px solid var(--color-border);
   box-shadow: var(--shadow-sm);
   backdrop-filter: var(--glass-blur);
@@ -152,6 +153,7 @@
   color: var(--color-primary);
   margin-bottom: 0.75rem;
   font-size: 1.1rem;
+
 }
 
 .sd-stat-label {
@@ -165,6 +167,7 @@
 
 .sd-stat-value {
   margin-top: 0.3rem;
+
   font-size: 1.35rem;
   font-weight: 800;
   color: var(--color-text);
@@ -175,6 +178,7 @@
 .sd-stat-sub {
   margin-top: 0.25rem;
   font-size: 0.74rem;
+
   color: var(--color-muted);
   line-height: 1.35;
 }
@@ -184,6 +188,7 @@
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
+
   width: 100%;
 }
 
@@ -210,6 +215,7 @@
   padding: 1.25rem;
   border-radius: var(--radius-xl);
   background: var(--glass-bg);
+
   border: 1px solid var(--color-border);
   box-shadow: var(--shadow-sm);
   backdrop-filter: var(--glass-blur);
