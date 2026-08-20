@@ -719,8 +719,34 @@ const getInterviewRequestsForRecruiter = async () => {
   ];
 
   const candidateMap = {};
+  const scoresMap = {};
 
   if (studentIds.length > 0) {
+    // 1. Fetch base profile information (email, name, avatar_url)
+    try {
+      const { data: baseProfiles, error: baseProfilesError } = await supabase
+        .from("profiles")
+        .select("id, email, name, avatar_url")
+        .in("id", studentIds);
+
+      if (!baseProfilesError && Array.isArray(baseProfiles)) {
+        baseProfiles.forEach((p) => {
+          if (p.id) {
+            candidateMap[p.id] = {
+              ...(candidateMap[p.id] || {}),
+              ...p,
+              email: p.email || "",
+              full_name: p.name || "",
+              name: p.name || "",
+            };
+          }
+        });
+      }
+    } catch (baseProfErr) {
+      console.warn("Base profiles lookup failed:", baseProfErr);
+    }
+
+    // 2. Fetch candidate profile metadata (location, bio, github_url, etc.)
     const {
       data: candidateProfiles,
       error: candidateProfilesError,
@@ -753,11 +779,32 @@ const getInterviewRequestsForRecruiter = async () => {
         }
       }
     );
+
+    // 3. Fetch latest resume analysis scores (which also contains candidate_name and candidate_email)
+    try {
+      const { data: scoresData, error: scoresError } = await supabase
+        .from("resume_analysis_scores")
+        .select("*")
+        .in("student_id", studentIds)
+        .order("analyzed_at", { ascending: false });
+
+      if (!scoresError && Array.isArray(scoresData)) {
+        scoresData.forEach((scoreItem) => {
+          if (scoreItem.student_id && !scoresMap[scoreItem.student_id]) {
+            scoresMap[scoreItem.student_id] = scoreItem;
+          }
+        });
+      }
+    } catch (scoreFetchErr) {
+      console.warn("Resume score lookup for recruiter failed:", scoreFetchErr);
+    }
   }
 
   return requests.map((request) => {
     const candidate =
       candidateMap[request.student_id] || {};
+    const analysisScore =
+      scoresMap[request.student_id] || null;
 
     const candidateName =
       request.candidate_name ||
@@ -765,6 +812,7 @@ const getInterviewRequestsForRecruiter = async () => {
       candidate.username ||
       candidate.full_name ||
       candidate.name ||
+      analysisScore?.candidate_name ||
       "Student Candidate";
 
     const avatar =
@@ -784,11 +832,18 @@ const getInterviewRequestsForRecruiter = async () => {
       "";
 
     const candidateEmail =
+      candidate.email ||
+      analysisScore?.candidate_email ||
       request.student_email ||
       request.candidate_email ||
       request.email ||
-      candidate.email ||
       "";
+
+    const computedScore =
+      analysisScore?.overall_score ??
+      candidate.ats_score ??
+      request.ats_score ??
+      null;
 
     return {
       ...request,
@@ -802,10 +857,8 @@ const getInterviewRequestsForRecruiter = async () => {
       candidate_avatar: avatar,
       img: avatar,
 
-      ats_score:
-        candidate.ats_score ||
-        request.ats_score ||
-        88,
+      ats_score: computedScore,
+      analysis_score: analysisScore,
 
       resume_url: resume,
       resume_file_url: resume,

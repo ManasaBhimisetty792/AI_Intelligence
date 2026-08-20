@@ -131,28 +131,17 @@ export const LiveInterviewPortal = () => {
         >
           <div>
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', padding: '0.35rem 0.75rem', borderRadius: 9999, background: 'var(--color-primary-light)', color: 'var(--color-primary)', fontSize: '0.75rem', fontWeight: 800, marginBottom: '0.5rem' }}>
-              <HiSparkles /> WebRTC &amp; LiveKit Studio Engine
+              <HiSparkles /> LiveKit Studio Engine
             </div>
             <h1 style={{ margin: '0.2rem 0 0.4rem', fontSize: '1.5rem', fontWeight: 800, color: 'var(--color-text)' }}>
               Live Interactive Technical Interview Studio
             </h1>
             <p style={{ margin: 0, color: 'var(--color-muted)', fontSize: '0.88rem', maxWidth: 650 }}>
-              Join live 1-on-1 recruiter interviews during your assigned time window or launch an instant AI Technical Drill session.
+              Join live 1-on-1 recruiter interviews during your assigned time window.
             </p>
           </div>
 
-          <button
-            onClick={startInstantSession}
-            style={{
-              display: 'inline-flex', alignItems: 'center', gap: '0.5rem',
-              padding: '0.75rem 1.3rem', borderRadius: 'var(--radius-md)',
-              background: 'var(--gradient-primary)', color: '#fff',
-              fontWeight: 800, fontSize: '0.85rem', border: 'none',
-              cursor: 'pointer', boxShadow: 'var(--shadow-glow-primary)',
-            }}
-          >
-            <FiPlay /> Launch Instant Practice Drill <FiArrowRight />
-          </button>
+    
         </div>
 
         {/* ACTIVE / SCHEDULED ROOMS SECTION */}

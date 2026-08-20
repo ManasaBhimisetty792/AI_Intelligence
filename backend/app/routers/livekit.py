@@ -9,6 +9,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from livekit import api
 from pydantic import BaseModel, Field
 from supabase import Client, create_client
+from app.core.config import settings
 
 
 router = APIRouter(
@@ -23,32 +24,32 @@ bearer_scheme = HTTPBearer(
 
 SUPABASE_URL = os.getenv(
     "SUPABASE_URL",
-    "",
+    settings.SUPABASE_URL,
 )
 
 SUPABASE_SERVICE_ROLE_KEY = os.getenv(
     "SUPABASE_SERVICE_ROLE_KEY",
-    "",
+    settings.SUPABASE_SERVICE_ROLE_KEY,
 )
 
 SUPABASE_JWT_SECRET = os.getenv(
     "SUPABASE_JWT_SECRET",
-    "",
+    "8ocIfoXBc7axN1GEvyiIYrz7yTS7jMnaqpUBBaRV+kq+qGe/+G/vZQsNJ6yvNtncxu0xPC/G3Tl+3EAbGWH23Q==",
 )
 
 LIVEKIT_API_KEY = os.getenv(
     "LIVEKIT_API_KEY",
-    "",
+    settings.LIVEKIT_API_KEY,
 )
 
 LIVEKIT_API_SECRET = os.getenv(
     "LIVEKIT_API_SECRET",
-    "",
+    settings.LIVEKIT_API_SECRET,
 )
 
 LIVEKIT_URL = os.getenv(
     "LIVEKIT_URL",
-    "",
+    settings.LIVEKIT_URL,
 )
 
 TOKEN_TTL_SECONDS = int(

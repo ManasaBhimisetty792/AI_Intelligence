@@ -77,6 +77,29 @@ export const ResumeAnalysis = () => {
       });
       setResult(data);
       toast.success("Done — here's how your resume compares.");
+
+      // ── Persist the score to Supabase so recruiter booking can be gated ──
+      const overallScore = data?.overall_resume_score?.score ?? data?.overall_score ?? 0;
+      const { saved, error: saveErr } = await resumeService.saveAnalysisScore(
+        data,
+        jdMode === 'text' ? jdText : '',
+        jdMode === 'file' ? (jdFile?.name || '') : ''
+      );
+      if (saved) {
+        if (overallScore >= 75) {
+          toast.success(
+            `✅ Score saved (${overallScore}%) — you can now book interviews with recruiters!`,
+            { duration: 5000 }
+          );
+        } else {
+          toast(
+            `📊 Score saved (${overallScore}%). You need ≥ 75% to book a recruiter interview. Keep improving!`,
+            { duration: 6000, icon: '⚠️' }
+          );
+        }
+      } else if (saveErr && saveErr !== 'Supabase not configured') {
+        console.warn('Score save warning:', saveErr);
+      }
     } catch (err) {
       const errMsg = err.message || 'Analysis failed. Please try again.';
       setError(errMsg);

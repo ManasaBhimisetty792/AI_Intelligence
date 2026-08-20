@@ -18,13 +18,16 @@ import {
   FiSearch,
   FiUser,
   FiX,
+  FiZapOff,
 } from "react-icons/fi";
 
 import { HiSparkles } from "react-icons/hi";
 import { toast } from "react-hot-toast";
+import { useNavigate } from "react-router-dom";
 
 import DashboardLayout from "../../components/Dashboard/DashboardLayout";
 import recruiterService from "../../services/recruiterService";
+import { resumeService } from "../../services/resumeService";
 
 import {
   isSupabaseConfigured,
@@ -180,6 +183,102 @@ function SkeletonCard() {
       <div className="skeleton skeleton-line skeleton-line-small" />
       <div className="skeleton skeleton-box" />
       <div className="skeleton skeleton-button" />
+    </div>
+  );
+}
+
+// ─── Score Gate Modal ─────────────────────────────────────────────────────────
+function ScoreGateModal({ score, record, onClose, onGoAnalyse }) {
+  const hasScore = score !== null && score !== undefined;
+  const scoreColor = hasScore && score >= 75 ? '#10b981' : '#ef4444';
+
+  return (
+    <div className="booking-modal-backdrop">
+      <div
+        className="glass-card booking-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="score-gate-title"
+        style={{ maxWidth: '460px' }}
+      >
+        {/* Header */}
+        <div className="booking-modal-header" style={{ borderBottom: '1px solid var(--color-border)', paddingBottom: '1rem', marginBottom: '1rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <span style={{ fontSize: '2rem' }}><FiZapOff style={{ color: '#ef4444' }} /></span>
+            <h3 id="score-gate-title" style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700 }}>
+              Resume Analysis Required
+            </h3>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="modal-close-button"
+            aria-label="Close"
+          >
+            <FiX />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div style={{ padding: '0 0.25rem' }}>
+          {/* Score display */}
+          <div style={{
+            background: 'var(--color-surface-sec)',
+            borderRadius: '12px',
+            padding: '1.25rem',
+            marginBottom: '1.25rem',
+            textAlign: 'center',
+            border: `2px solid ${scoreColor}22`,
+          }}>
+            <div style={{ fontSize: '3rem', fontWeight: 800, color: scoreColor, lineHeight: 1 }}>
+              {hasScore ? `${score}%` : '—'}
+            </div>
+            <div style={{ fontSize: '0.8rem', color: 'var(--color-muted)', marginTop: '0.4rem' }}>
+              {hasScore ? 'Your latest resume score' : 'No analysis found'}
+            </div>
+            {record?.analyzed_at && (
+              <div style={{ fontSize: '0.75rem', color: 'var(--color-muted)', marginTop: '0.25rem' }}>
+                Analysed on {new Date(record.analyzed_at).toLocaleDateString('en-IN', {
+                  day: 'numeric', month: 'short', year: 'numeric',
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Explanation */}
+          <p style={{ fontSize: '0.9rem', color: 'var(--color-text)', lineHeight: 1.6, marginBottom: '1rem' }}>
+            {hasScore
+              ? `Your current resume score is ${score}%, which is below the required 75% threshold. Please improve your resume and run the analysis again to unlock recruiter booking.`
+              : 'You have not run a resume analysis yet. Complete the Resume Readiness Check first — you need a score of at least 75% to book an interview with a recruiter.'}
+          </p>
+
+          {/* Requirement bar */}
+          <div style={{ background: 'var(--color-surface-sec)', borderRadius: '8px', padding: '0.75rem 1rem', marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.85rem' }}>
+            <span style={{ color: 'var(--color-muted)' }}>Minimum required score</span>
+            <span style={{ fontWeight: 700, color: '#10b981', fontSize: '1rem' }}>75%</span>
+          </div>
+
+          {/* Actions */}
+          <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              className="btn-primary"
+              onClick={onGoAnalyse}
+              style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', padding: '10px 16px', fontSize: '0.875rem', fontWeight: 600 }}
+            >
+              <HiSparkles /> Analyse My Resume
+            </button>
+            <button
+              type="button"
+              className="btn-secondary"
+              onClick={onClose}
+              style={{ flex: '0 0 auto', padding: '10px 16px', fontSize: '0.875rem', fontWeight: 600 }}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -636,6 +735,7 @@ function RecruiterCard({
 }
 
 export default function FindRecruiters() {
+  const navigate = useNavigate();
   const [recruiters, setRecruiters] =
     useState([]);
 
@@ -658,6 +758,13 @@ export default function FindRecruiters() {
 
   const [submitting, setSubmitting] =
     useState(false);
+
+  // ── Resume score gate state ───────────────────────────────────────────────
+  const [scoreChecked, setScoreChecked] = useState(false);
+  const [latestScore, setLatestScore] = useState(null);
+  const [latestScoreRecord, setLatestScoreRecord] = useState(null);
+  const [showScoreGate, setShowScoreGate] = useState(false);
+  const [pendingRecruiter, setPendingRecruiter] = useState(null);
 
   const fetchRecruiters = useCallback(
     async () => {
@@ -706,6 +813,20 @@ export default function FindRecruiters() {
     },
     []
   );
+
+  // ── Fetch the student's latest resume analysis score on mount ─────────────
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { score, record } = await resumeService.getLatestScore();
+      if (!cancelled) {
+        setLatestScore(score);
+        setLatestScoreRecord(record);
+        setScoreChecked(true);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
     fetchRecruiters();
@@ -779,6 +900,24 @@ export default function FindRecruiters() {
     searchQuery,
     selectedSort,
   ]);
+
+  // ── Gated booking handler ─────────────────────────────────────────────────
+  const handleBookClick = useCallback((recruiter) => {
+    const SCORE_THRESHOLD = 75;
+    if (!scoreChecked) {
+      // Score still loading — optimistically allow but check will re-run
+      toast('Checking your resume score…', { icon: '⏳' });
+      return;
+    }
+    if (latestScore !== null && latestScore >= SCORE_THRESHOLD) {
+      // ✅ Score qualifies — open booking modal directly
+      setBookingRecruiter(recruiter);
+    } else {
+      // ❌ Score too low or no analysis — show gate modal
+      setPendingRecruiter(recruiter);
+      setShowScoreGate(true);
+    }
+  }, [scoreChecked, latestScore]);
 
   const handleConfirmBooking = async ({
     interviewType,
@@ -903,7 +1042,6 @@ export default function FindRecruiters() {
       setSubmitting(false);
     }
   };
-
   return (
     <DashboardLayout title="Find Recruiters for Mock Interviews">
       <div className="find-recruiters-page">
@@ -946,6 +1084,63 @@ export default function FindRecruiters() {
           </button>
         </section>
 
+        {/* ── Score status banner ── */}
+        {scoreChecked && (
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.75rem',
+            padding: '0.75rem 1.1rem',
+            borderRadius: '10px',
+            marginBottom: '0.5rem',
+            background: latestScore !== null && latestScore >= 75
+              ? 'rgba(16,185,129,0.08)'
+              : 'rgba(239,68,68,0.07)',
+            border: `1px solid ${
+              latestScore !== null && latestScore >= 75
+                ? 'rgba(16,185,129,0.3)'
+                : 'rgba(239,68,68,0.25)'
+            }`,
+            fontSize: '0.875rem',
+          }}>
+            {latestScore !== null && latestScore >= 75 ? (
+              <>
+                <FiCheckCircle style={{ color: '#10b981', flexShrink: 0 }} />
+                <span style={{ color: 'var(--color-text)' }}>
+                  Resume score: <strong style={{ color: '#10b981' }}>{latestScore}%</strong> — You are eligible to book recruiter interviews.
+                </span>
+              </>
+            ) : (
+              <>
+                <FiAlertCircle style={{ color: '#ef4444', flexShrink: 0 }} />
+                <span style={{ color: 'var(--color-text)' }}>
+                  {latestScore !== null
+                    ? <>Resume score: <strong style={{ color: '#ef4444' }}>{latestScore}%</strong> — You need ≥ 75% to book interviews.</>
+                    : 'No resume analysis found — complete the Resume Readiness Check to unlock booking.'}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => navigate('/student/resume-analysis')}
+                  style={{
+                    marginLeft: 'auto',
+                    flexShrink: 0,
+                    background: '#ef4444',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '6px',
+                    padding: '5px 12px',
+                    fontSize: '0.78rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Analyse Now
+                </button>
+              </>
+            )}
+          </div>
+        )}
+
         <section className="glass-card recruiter-filters">
           <div className="search-sort-row">
             <div className="search-wrapper">
@@ -963,32 +1158,6 @@ export default function FindRecruiters() {
                 className="input-field search-input"
               />
             </div>
-
-            {/* <select
-              value={selectedSort}
-              onChange={(event) =>
-                setSelectedSort(
-                  event.target.value
-                )
-              }
-              className="input-field sort-select"
-            >
-              <option value="top-rated">
-                Verified First
-              </option>
-
-              <option value="most-experienced">
-                Most Experienced
-              </option>
-
-              <option value="newest">
-                Newest Added
-              </option>
-
-              <option value="company">
-                Company Name
-              </option>
-            </select> */}
           </div>
         </section>
 
@@ -1038,13 +1207,14 @@ export default function FindRecruiters() {
                 <RecruiterCard
                   key={recruiter.id}
                   recruiter={recruiter}
-                  onBook={setBookingRecruiter}
+                  onBook={handleBookClick}
                 />
               )
             )}
           </div>
         )}
 
+        {/* Booking Modal — only shown when score qualifies */}
         {bookingRecruiter && (
           <BookingModal
             key={bookingRecruiter.id}
@@ -1056,6 +1226,22 @@ export default function FindRecruiters() {
             }}
             onConfirm={handleConfirmBooking}
             submitting={submitting}
+          />
+        )}
+
+        {/* Score Gate Modal — shown when score < 75 or no analysis */}
+        {showScoreGate && (
+          <ScoreGateModal
+            score={latestScore}
+            record={latestScoreRecord}
+            onClose={() => {
+              setShowScoreGate(false);
+              setPendingRecruiter(null);
+            }}
+            onGoAnalyse={() => {
+              setShowScoreGate(false);
+              navigate('/student/resume-analysis');
+            }}
           />
         )}
       </div>

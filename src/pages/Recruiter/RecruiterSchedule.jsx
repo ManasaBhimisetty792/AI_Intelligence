@@ -756,7 +756,7 @@ export const RecruiterSchedule = () => {
               {/* Meeting Link */}
               <div style={{ marginBottom: "1.5rem" }}>
                 <label style={{ display: "block", fontSize: "0.84rem", fontWeight: 700, marginBottom: "0.35rem", color: "var(--color-text)" }}>
-                  Meeting Link (WebRTC Studio or Zoom URL)
+                  Meeting Link (Livekit)
                 </label>
                 <input
                   type="text"
@@ -775,7 +775,7 @@ export const RecruiterSchedule = () => {
                   }}
                 />
                 <span style={{ fontSize: "0.74rem", color: "var(--color-muted)", marginTop: "0.25rem", display: "block" }}>
-                  Defaults to built-in WebRTC Live Studio or paste a custom Zoom / Google Meet room URL.
+                  Defaults to built-in LiveKit Live Studio or paste a custom Zoom / Google Meet room URL.
                 </span>
               </div>
 

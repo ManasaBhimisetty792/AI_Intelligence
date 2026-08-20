@@ -2,8 +2,13 @@ import time
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+import os
+from pathlib import Path
 from dotenv import load_dotenv
 
+_backend_dir = Path(__file__).resolve().parent.parent
+load_dotenv(_backend_dir / ".env")
+load_dotenv(_backend_dir.parent / ".env")
 load_dotenv()
 from app.core.config import settings
 from app.core.logging import logger

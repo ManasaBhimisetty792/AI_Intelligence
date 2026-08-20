@@ -181,7 +181,7 @@ export const RecruiterDashboard = () => {
       accent: '#10B981',
       accentBg: 'rgba(16, 185, 129, 0.12)',
       route: '/recruiter/interviews',
-      trend: 'WebRTC audio/video studio ready',
+      trend: 'Livekit audio/video studio ready',
     },
     {
       label: 'Completed Drills',
@@ -259,7 +259,7 @@ export const RecruiterDashboard = () => {
     {
       step: '02',
       title: 'Assign Schedule',
-      desc: 'Set date, start/end time window and WebRTC room link',
+      desc: 'Set date, start/end time window and LiveKit room link',
       color: '#10B981',
       route: '/recruiter/schedule',
     },

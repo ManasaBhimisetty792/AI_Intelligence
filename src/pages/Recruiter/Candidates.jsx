@@ -433,9 +433,9 @@ export const Candidates = () => {
                     </div>
                   </div>
 
-                  {/* Middle Column: Preferred Schedule & Student Notes */}
-                  <div style={{ flex: "2 1 320px", minWidth: 240 }}>
-                    <div style={{ fontSize: "0.82rem", color: "var(--color-muted)", display: "flex", alignItems: "center", gap: "0.4rem", marginBottom: "0.35rem" }}>
+                  {/* Middle Column: Preferred Schedule */}
+                  <div style={{ flex: "1 1 200px", minWidth: 180 }}>
+                    <div style={{ fontSize: "0.82rem", color: "var(--color-muted)", display: "flex", alignItems: "center", gap: "0.4rem" }}>
                       <FiCalendar style={{ color: "var(--color-primary)" }} />
                       <strong>Requested Slot:</strong>{" "}
                       {req.preferred_datetime
@@ -450,25 +450,8 @@ export const Candidates = () => {
                         : "Flexible timing"}
                     </div>
 
-                    {req.message && (
-                      <div
-                        style={{
-                          fontSize: "0.8rem",
-                          color: "var(--color-text)",
-                          background: "var(--color-surface-sec)",
-                          borderLeft: "3px solid var(--color-primary)",
-                          padding: "0.4rem 0.65rem",
-                          borderRadius: "0 6px 6px 0",
-                          fontStyle: "italic",
-                          lineHeight: 1.4,
-                        }}
-                      >
-                        "{req.message}"
-                      </div>
-                    )}
-
                     {status === "reschedule_requested" && req.reschedule_datetime && (
-                      <div style={{ fontSize: "0.78rem", color: "#8B5CF6", marginTop: "0.3rem", fontWeight: 700 }}>
+                      <div style={{ fontSize: "0.78rem", color: "#8B5CF6", marginTop: "0.35rem", fontWeight: 700 }}>
                         ⏳ Reschedule proposed: {new Date(req.reschedule_datetime).toLocaleString()}
                       </div>
                     )}
@@ -481,7 +464,7 @@ export const Candidates = () => {
                       onClick={() => setProfileModalReq(req)}
                       className="btn btn-outline"
                       style={{ padding: "0.5rem 0.85rem", fontSize: "0.82rem", display: "inline-flex", alignItems: "center", gap: "0.35rem" }}
-                      title="View Candidate Full Profile"
+                      title="View Candidate Full Profile, Scores & Job Description"
                     >
                       <FiEye /> View Profile
                     </button>
@@ -566,6 +549,25 @@ export const Candidates = () => {
             candidate={profileModalReq.student || { id: getStudentId(profileModalReq), full_name: getCandidateName(profileModalReq), email: getCandidateEmail(profileModalReq) }}
             request={profileModalReq}
             onClose={() => setProfileModalReq(null)}
+            onAccept={() => {
+              const reqToAccept = profileModalReq;
+              setProfileModalReq(null);
+              handleAccept(reqToAccept);
+            }}
+            onReject={() => {
+              const reqToDecline = profileModalReq;
+              setProfileModalReq(null);
+              setDeclineModalReq(reqToDecline);
+              setDeclineReason("");
+            }}
+            onReschedule={() => {
+              const reqToReschedule = profileModalReq;
+              setProfileModalReq(null);
+              setRescheduleModalReq(reqToReschedule);
+              setRescheduleDate("");
+              setRescheduleTime("");
+              setRescheduleReason("");
+            }}
           />
         )}
 
